@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Bell, Search, Plus } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -13,16 +13,21 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const Header = () => {
+  const handleLogout = () => {
+    localStorage.removeItem('expenza-auth');
+    window.location.reload();
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between px-4">
+      <div className="container flex h-14 lg:h-16 items-center justify-between px-4">
         {/* Search */}
         <div className="flex-1 max-w-md ml-12 lg:ml-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search expenses, groups, or categories..."
-              className="pl-10 bg-muted/50 border-0 focus-visible:ring-1"
+              className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 text-sm"
             />
           </div>
         </div>
@@ -34,7 +39,7 @@ const Header = () => {
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
-                Add
+                <span className="hidden sm:inline">Add</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card">
@@ -53,12 +58,6 @@ const Header = () => {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full text-xs"></span>
-          </Button>
-
           {/* Profile */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -70,8 +69,8 @@ const Header = () => {
               <DropdownMenuItem asChild>
                 <Link to="/profile">Profile</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to="/settings">Settings</Link>
+              <DropdownMenuItem onClick={handleLogout}>
+                Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
