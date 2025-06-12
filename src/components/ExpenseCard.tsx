@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { Calendar, User, Tag, Banknote } from 'lucide-react';
+import { Calendar, User, Tag, Banknote, Edit, Trash2 } from 'lucide-react';
 import { Expense } from '@/types/expense';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -28,8 +29,18 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
     });
   };
 
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEdit?.(expense);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.(expense.id);
+  };
+
   return (
-    <Card className="expense-card group cursor-pointer" onClick={() => onEdit?.(expense)}>
+    <Card className="p-4 hover:shadow-md transition-all duration-200 group">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
@@ -85,6 +96,16 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
               Split {expense.splitBetween.length} ways
             </Badge>
           )}
+          
+          {/* Action buttons */}
+          <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleEdit}>
+              <Edit className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={handleDelete}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </Card>

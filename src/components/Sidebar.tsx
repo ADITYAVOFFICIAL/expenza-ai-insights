@@ -46,24 +46,24 @@ const Sidebar = () => {
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-card">
       {/* Logo */}
-      <div className="p-6 border-b border-border">
+      <div className="p-4 lg:p-6 border-b border-border">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-            <Wallet className="w-6 h-6 text-primary-foreground" />
+          <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+            <Wallet className="w-4 h-4 lg:w-6 lg:h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Expenza</h1>
-            <p className="text-xs text-muted-foreground">Smart Finance Tracker</p>
+            <h1 className="text-lg lg:text-xl font-bold text-foreground">Expenza</h1>
+            <p className="text-xs text-muted-foreground hidden lg:block">Smart Finance Tracker</p>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-6">
+      <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6 overflow-y-auto">
         {/* Main Actions */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 px-3 mb-3">
-            <Receipt className="w-4 h-4 text-muted-foreground" />
+        <div className="space-y-1 lg:space-y-2">
+          <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
+            <Receipt className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Main</span>
           </div>
           {sidebarItems.filter(item => item.category === 'main').map((item) => {
@@ -74,26 +74,26 @@ const Sidebar = () => {
                 to={item.href}
                 onClick={() => setIsMobileOpen(false)}
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+                  "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-md" 
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <item.icon className={cn(
-                  "w-5 h-5 transition-colors",
+                  "w-4 h-4 lg:w-5 lg:h-5 transition-colors shrink-0",
                   isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium text-sm lg:text-base">{item.label}</span>
               </Link>
             );
           })}
         </div>
 
         {/* Insights */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 px-3 mb-3">
-            <BarChart3 className="w-4 h-4 text-muted-foreground" />
+        <div className="space-y-1 lg:space-y-2">
+          <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
+            <BarChart3 className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Insights</span>
           </div>
           {sidebarItems.filter(item => item.category === 'insights').map((item) => {
@@ -104,26 +104,26 @@ const Sidebar = () => {
                 to={item.href}
                 onClick={() => setIsMobileOpen(false)}
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+                  "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-md" 
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <item.icon className={cn(
-                  "w-5 h-5 transition-colors",
+                  "w-4 h-4 lg:w-5 lg:h-5 transition-colors shrink-0",
                   isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium text-sm lg:text-base">{item.label}</span>
               </Link>
             );
           })}
         </div>
 
         {/* Social & Planning */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2 px-3 mb-3">
-            <Users className="w-4 h-4 text-muted-foreground" />
+        <div className="space-y-1 lg:space-y-2">
+          <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
+            <Users className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Social & Planning</span>
           </div>
           {sidebarItems.filter(item => ['social', 'planning'].includes(item.category)).map((item) => {
@@ -134,17 +134,17 @@ const Sidebar = () => {
                 to={item.href}
                 onClick={() => setIsMobileOpen(false)}
                 className={cn(
-                  "flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+                  "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
                     ? "bg-primary text-primary-foreground shadow-md" 
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <item.icon className={cn(
-                  "w-5 h-5 transition-colors",
+                  "w-4 h-4 lg:w-5 lg:h-5 transition-colors shrink-0",
                   isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
                 )} />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium text-sm lg:text-base">{item.label}</span>
               </Link>
             );
           })}
@@ -152,20 +152,20 @@ const Sidebar = () => {
       </nav>
 
       {/* Bottom section */}
-      <div className="p-4 border-t border-border space-y-2">
+      <div className="p-3 lg:p-4 border-t border-border space-y-1 lg:space-y-2">
         <Link
           to="/profile"
-          className="flex items-center space-x-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          className="flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
         >
-          <User className="w-5 h-5" />
-          <span className="font-medium">Profile</span>
+          <User className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
+          <span className="font-medium text-sm lg:text-base">Profile</span>
         </Link>
         <Link
           to="/settings"
-          className="flex items-center space-x-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          className="flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
         >
-          <Settings className="w-5 h-5" />
-          <span className="font-medium">Settings</span>
+          <Settings className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
+          <span className="font-medium text-sm lg:text-base">Settings</span>
         </Link>
       </div>
     </div>
@@ -176,13 +176,13 @@ const Sidebar = () => {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-card border border-border shadow-lg"
+        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-card border border-border shadow-lg"
       >
-        <Menu className="w-6 h-6" />
+        <Menu className="w-5 h-5" />
       </button>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-72 border-r border-border shadow-sm">
+      <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 xl:w-72 border-r border-border shadow-sm">
         <SidebarContent />
       </div>
 
@@ -190,13 +190,13 @@ const Sidebar = () => {
       {isMobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-72 border-r border-border shadow-lg">
-            <div className="flex justify-end p-4">
+          <div className="absolute left-0 top-0 bottom-0 w-64 sm:w-72 border-r border-border shadow-lg">
+            <div className="flex justify-end p-3">
               <button
                 onClick={() => setIsMobileOpen(false)}
                 className="p-2 rounded-lg hover:bg-muted"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             <SidebarContent />
