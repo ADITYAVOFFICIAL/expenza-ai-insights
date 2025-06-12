@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +15,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const Header = () => {
-  const handleLogout = () => {
-    localStorage.removeItem('expenza-auth');
-    window.location.reload();
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -62,7 +69,11 @@ const Header = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent"></div>
+                <Avatar className="w-8 h-8">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-sm">
+                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card">

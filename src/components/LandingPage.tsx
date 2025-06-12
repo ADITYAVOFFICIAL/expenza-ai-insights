@@ -1,9 +1,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Shield, Users, Target, TrendingUp } from 'lucide-react';
+import { ArrowRight, Shield, Users, Target, TrendingUp, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Link } from 'react-router-dom';
 
 const LandingPage = () => {
   const fadeInUp = {
@@ -22,6 +23,27 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+              <Wallet className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <h1 className="text-xl font-bold text-foreground">Expenza</h1>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <Link to="/login">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link to="/signup">
+              <Button>Get Started</Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden py-20 px-4">
         <motion.div 
@@ -49,12 +71,16 @@ const LandingPage = () => {
             variants={fadeInUp}
             className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Button size="lg" className="gradient-primary text-white shadow-xl hover:shadow-2xl transition-all duration-300">
-              Get Started <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-            <Button size="lg" variant="outline">
-              Watch Demo
-            </Button>
+            <Link to="/signup">
+              <Button size="lg" className="gradient-primary text-white shadow-xl hover:shadow-2xl transition-all duration-300">
+                Get Started <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button size="lg" variant="outline">
+                Sign In
+              </Button>
+            </Link>
           </motion.div>
         </motion.div>
       </section>
@@ -122,9 +148,11 @@ const LandingPage = () => {
           <Card className="p-12 gradient-primary text-white">
             <h2 className="text-3xl font-bold mb-4">Ready to Take Control of Your Finances?</h2>
             <p className="text-xl mb-8 opacity-90">Join thousands of users who are already managing their money smarter.</p>
-            <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-100">
-              Start Your Journey <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
+            <Link to="/signup">
+              <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-100">
+                Start Your Journey <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </Link>
           </Card>
         </motion.div>
       </section>

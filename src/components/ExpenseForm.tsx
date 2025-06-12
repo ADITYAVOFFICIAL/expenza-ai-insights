@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
 import { Calendar, Upload, Scan, Edit, Trash2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -129,12 +127,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+    <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+      <form onSubmit={handleSubmit}>
         {/* Header for editing */}
         {isEditing && (
           <div className="flex items-center justify-between mb-4">
@@ -154,11 +148,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
         {/* Duplicate Warning */}
         {duplicateWarning && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
-          >
+          <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
             <p className="text-orange-800 text-sm">{duplicateWarning}</p>
             <div className="flex gap-2 mt-2">
               <Button 
@@ -177,7 +167,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 Add Anyway
               </Button>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Basic Information */}
@@ -345,7 +335,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           )}
         </div>
       </form>
-    </motion.div>
+    </div>
   );
 };
 
