@@ -1,0 +1,87 @@
+
+[
+  {
+    "id": "food",
+    "name": "Food & Dining",
+    "icon": "utensils",
+    "color": "#f97316"
+  },
+  {
+    "id": "transport",
+    "name": "Transportation",
+    "icon": "car",
+    "color": "#3b82f6"
+  },
+  {
+    "id": "shopping",
+    "name": "Shopping",
+    "icon": "shopping-bag",
+    "color": "#ec4899"
+  },
+  {
+    "id": "entertainment",
+    "name": "Entertainment",
+    "icon": "film",
+    "color": "#8b5cf6"
+  },
+  {
+    "id": "bills",
+    "name": "Bills & Utilities",
+    "icon": "file-text",
+    "color": "#ef4444"
+  },
+  {
+    "id": "health",
+    "name": "Health & Medical",
+    "icon": "heart",
+    "color": "#10b981"
+  },
+  {
+    "id": "education",
+    "name": "Education",
+    "icon": "book",
+    "color": "#6366f1"
+  },
+  {
+    "id": "travel",
+    "name": "Travel",
+    "icon": "plane",
+    "color": "#06b6d4"
+  },
+  {
+    "id": "rent",
+    "name": "Rent & Housing",
+    "icon": "home",
+    "color": "#84cc16"
+  },
+  {
+    "id": "groceries",
+    "name": "Groceries",
+    "icon": "shopping-cart",
+    "color": "#22c55e"
+  },
+  {
+    "id": "fuel",
+    "name": "Fuel",
+    "icon": "fuel",
+    "color": "#f59e0b"
+  },
+  {
+    "id": "insurance",
+    "name": "Insurance",
+    "icon": "shield",
+    "color": "#64748b"
+  },
+  {
+    "id": "gifts",
+    "name": "Gifts & Donations",
+    "icon": "gift",
+    "color": "#f472b6"
+  },
+  {
+    "id": "other",
+    "name": "Other",
+    "icon": "more-horizontal",
+    "color": "#6b7280"
+  }
+]

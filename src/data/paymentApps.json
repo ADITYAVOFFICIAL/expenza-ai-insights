@@ -1,0 +1,48 @@
+
+[
+  {
+    "id": "paytm",
+    "name": "Paytm",
+    "icon": "smartphone"
+  },
+  {
+    "id": "gpay",
+    "name": "Google Pay",
+    "icon": "smartphone"
+  },
+  {
+    "id": "phonepe",
+    "name": "PhonePe",
+    "icon": "smartphone"
+  },
+  {
+    "id": "upi",
+    "name": "UPI",
+    "icon": "smartphone"
+  },
+  {
+    "id": "cash",
+    "name": "Cash",
+    "icon": "banknote"
+  },
+  {
+    "id": "card",
+    "name": "Debit/Credit Card",
+    "icon": "credit-card"
+  },
+  {
+    "id": "netbanking",
+    "name": "Net Banking",
+    "icon": "globe"
+  },
+  {
+    "id": "wallet",
+    "name": "Digital Wallet",
+    "icon": "wallet"
+  },
+  {
+    "id": "other",
+    "name": "Other",
+    "icon": "more-horizontal"
+  }
+]
