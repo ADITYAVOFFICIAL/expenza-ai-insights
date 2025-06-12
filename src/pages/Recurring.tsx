@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar, Plus, Edit, Trash2, Pause, Play } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -341,7 +340,6 @@ const Recurring = () => {
                     <Switch
                       checked={expense.isActive}
                       onCheckedChange={() => toggleRecurring(expense.id)}
-                      size="sm"
                     />
                   </div>
                 </div>

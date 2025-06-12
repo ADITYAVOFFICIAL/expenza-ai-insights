@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { TrendingUp, Calendar, Filter, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import BankChart from '@/components/charts/BankChart';
 import SavingsCategoryChart from '@/components/charts/SavingsCategoryChart';
+import SavingsTrackingChart from '@/components/charts/SavingsTrackingChart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const Analytics = () => {
@@ -38,18 +38,18 @@ const Analytics = () => {
     { day: '13', amount: 1100 }, { day: '14', amount: 300 }, { day: '15', amount: 650 },
   ];
 
-  const bankData = [
-    { name: 'HDFC Bank', value: 25000, color: '#3b82f6' },
-    { name: 'SBI', value: 18000, color: '#10b981' },
-    { name: 'ICICI Bank', value: 12000, color: '#f59e0b' },
-    { name: 'Axis Bank', value: 8000, color: '#ef4444' }
+  const expenseByBank = [
+    { name: 'HDFC Bank', value: 25000, color: '#3b82f6', percentage: 39.4 },
+    { name: 'SBI', value: 18000, color: '#10b981', percentage: 28.3 },
+    { name: 'ICICI Bank', value: 12000, color: '#f59e0b', percentage: 18.9 },
+    { name: 'Axis Bank', value: 8000, color: '#ef4444', percentage: 12.6 }
   ];
 
-  const allowanceData = [
-    { name: 'HDFC Bank', value: 50000, color: '#3b82f6' },
-    { name: 'SBI', value: 35000, color: '#10b981' },
-    { name: 'ICICI Bank', value: 25000, color: '#f59e0b' },
-    { name: 'Axis Bank', value: 15000, color: '#ef4444' }
+  const allowanceByBank = [
+    { name: 'HDFC Bank', value: 50000, color: '#3b82f6', percentage: 40.0 },
+    { name: 'SBI', value: 35000, color: '#10b981', percentage: 28.0 },
+    { name: 'ICICI Bank', value: 25000, color: '#f59e0b', percentage: 20.0 },
+    { name: 'Axis Bank', value: 15000, color: '#ef4444', percentage: 12.0 }
   ];
 
   return (
@@ -58,7 +58,7 @@ const Analytics = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="text-muted-foreground text-sm lg:text-base">Insights into your spending patterns</p>
+          <p className="text-muted-foreground text-sm lg:text-base">Comprehensive insights into your spending patterns and financial health</p>
         </div>
         <div className="flex gap-2">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
@@ -82,16 +82,17 @@ const Analytics = () => {
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {[
-          { label: 'Total Spent', value: '₹63,400', change: '+12%', color: 'text-red-600' },
-          { label: 'Total Income', value: '₹3,30,000', change: '+8%', color: 'text-green-600' },
-          { label: 'Savings', value: '₹2,66,600', change: '+15%', color: 'text-blue-600' },
-          { label: 'Avg Daily', value: '₹2,113', change: '-3%', color: 'text-orange-600' }
+          { label: 'Total Spent', value: '₹63,400', change: '+12%', color: 'text-red-600', description: 'Across all banks' },
+          { label: 'Total Income', value: '₹3,30,000', change: '+8%', color: 'text-green-600', description: 'Including allowances' },
+          { label: 'Net Savings', value: '₹2,66,600', change: '+15%', color: 'text-blue-600', description: 'After all expenses' },
+          { label: 'Avg Daily Spend', value: '₹2,113', change: '-3%', color: 'text-orange-600', description: 'Based on active days' }
         ].map((metric, index) => (
           <Card key={index}>
             <CardContent className="p-4 lg:p-6">
-              <div className="text-xs lg:text-sm text-muted-foreground">{metric.label}</div>
-              <div className="text-lg lg:text-2xl font-bold">{metric.value}</div>
-              <div className={`text-xs lg:text-sm ${metric.color}`}>{metric.change}</div>
+              <div className="text-xs lg:text-sm text-muted-foreground mb-1">{metric.label}</div>
+              <div className="text-lg lg:text-2xl font-bold mb-1">{metric.value}</div>
+              <div className={`text-xs lg:text-sm ${metric.color} mb-1`}>{metric.change}</div>
+              <div className="text-xs text-muted-foreground">{metric.description}</div>
             </CardContent>
           </Card>
         ))}
@@ -103,9 +104,23 @@ const Analytics = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Expenses by Bank</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Distribution of expenses across different banks. Total: ₹{expenseByBank.reduce((sum, bank) => sum + bank.value, 0).toLocaleString()}
+            </p>
           </CardHeader>
           <CardContent>
-            <BankChart data={bankData} title="" />
+            <BankChart data={expenseByBank} title="" />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {expenseByBank.map((bank, index) => (
+                <div key={index} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bank.color }}></div>
+                    <span>{bank.name}</span>
+                  </div>
+                  <span className="font-medium">{bank.percentage}%</span>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -113,16 +128,40 @@ const Analytics = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Allowance by Bank</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Income distribution from different bank allowances. Total: ₹{allowanceByBank.reduce((sum, bank) => sum + bank.value, 0).toLocaleString()}
+            </p>
           </CardHeader>
           <CardContent>
-            <BankChart data={allowanceData} title="" />
+            <BankChart data={allowanceByBank} title="" />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {allowanceByBank.map((bank, index) => (
+                <div key={index} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bank.color }}></div>
+                    <span>{bank.name}</span>
+                  </div>
+                  <span className="font-medium">{bank.percentage}%</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Savings Tracking Chart */}
+        <Card className="xl:col-span-2">
+          <CardContent className="p-0">
+            <SavingsTrackingChart />
           </CardContent>
         </Card>
 
         {/* Monthly Trends */}
         <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">Monthly Trends</CardTitle>
+            <CardTitle className="text-lg">Financial Trends Over Time</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Track your income, expenses, and savings patterns to identify trends and optimize your financial health
+            </p>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -142,66 +181,6 @@ const Analytics = () => {
                 <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2} name="Income" />
                 <Line type="monotone" dataKey="savings" stroke="#3b82f6" strokeWidth={2} name="Savings" />
               </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Category Analysis */}
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Category Budget Analysis</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {categorySpending.map((category, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">{category.category}</span>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">₹{category.amount.toLocaleString()}</div>
-                      <div className="text-xs text-muted-foreground">of ₹{category.budget.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${
-                        category.percentage > 90 ? 'bg-red-500' : 
-                        category.percentage > 80 ? 'bg-orange-500' : 'bg-green-500'
-                      }`}
-                      style={{ width: `${category.percentage}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{category.percentage}% used</span>
-                    <span>₹{(category.budget - category.amount).toLocaleString()} remaining</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Daily Spending Pattern */}
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Daily Spending Pattern (This Month)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={dailySpending}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="day" className="text-xs" />
-                <YAxis className="text-xs" tickFormatter={(value) => `₹${value}`} />
-                <Tooltip
-                  formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--background))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar dataKey="amount" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
