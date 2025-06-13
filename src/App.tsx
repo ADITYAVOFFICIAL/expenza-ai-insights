@@ -7,7 +7,13 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "./components/Layout";
+import PublicLayout from "@/components/PublicLayout"; // <-- Import PublicLayout
 import { Wallet } from "lucide-react"; // Import the Wallet icon
+import Login from '@/pages/Login';
+import Signup from '@/pages/Signup';
+import LandingPage from '@/components/LandingPage';
+import Privacy from '@/pages/Privacy';
+import Tos from '@/pages/Tos';
 
 const queryClient = new QueryClient();
 
@@ -22,9 +28,6 @@ const Reports = React.lazy(() => import("./pages/Reports"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const PassBook = React.lazy(() => import("./pages/Passbook"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
-const Login = React.lazy(() => import("./pages/Login"));
-const Signup = React.lazy(() => import("./pages/Signup"));
-const LandingPage = React.lazy(() => import("./components/LandingPage")); // Or src/pages/LandingPage.tsx if that's the one used for routing
 
 // A simple loader component for Suspense fallback
 const PageLoader = () => (
@@ -72,7 +75,10 @@ const AppContent = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="*" element={<LandingPage />} />
+            {/* Wrap Privacy and TOS with PublicLayout */}
+            <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
+            <Route path="/terms" element={<PublicLayout><Tos /></PublicLayout>} />
+            <Route path="*" element={<LandingPage />} /> {/* LandingPage might have its own header/footer */}
           </Routes>
         </Suspense>
       </BrowserRouter>
@@ -83,7 +89,7 @@ const AppContent = () => {
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Layout />}>
+          <Route path="/" element={<Layout />}> {/* Layout contains Header and Sidebar */}
             <Route index element={<Dashboard />} />
             <Route path="add-expense" element={<AddExpense />} />
             <Route path="analytics" element={<Analytics />} />
