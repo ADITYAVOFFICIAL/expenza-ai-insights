@@ -259,7 +259,7 @@ const Dashboard = () => {
         notes: expenseFormData.notes || undefined,
         paymentMethod: (expenseFormData as any).paymentApp || undefined, // form sends paymentApp, save as paymentMethod
         bank: expenseFormData.bank || undefined,
-        billImage: expenseFormData.billImage || undefined,
+        billImage: expenseFormData.billImage, // Changed from expenseFormData.billImage || undefined
         isRecurring: expenseFormData.isRecurring || false,
         groupId: expenseFormData.groupId || undefined,
         paidBy: expenseFormData.paidBy || undefined,
@@ -290,7 +290,22 @@ const Dashboard = () => {
 
     if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
       try {
-        await databaseService.deleteExpense(expenseId);
+        // Fetch the expense to get the billImage ID
+        const expenseToDelete = await databaseService.getDocument(COLLECTIONS.EXPENSES, expenseId);
+        const billImageId = (expenseToDelete as unknown as Expense).billImage;
+
+        await databaseService.deleteExpense(expenseId); // Delete expense document
+
+        if (billImageId) {
+          try {
+            await storageService.deleteFile(billImageId); // Delete associated bill image
+            console.log(`Bill image ${billImageId} deleted successfully.`);
+          } catch (fileError) {
+            console.error("Error deleting bill image:", fileError);
+            // Optionally notify user, but primary deletion was successful
+          }
+        }
+
         toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
         fetchData(); // Refresh data
       } catch (error) {

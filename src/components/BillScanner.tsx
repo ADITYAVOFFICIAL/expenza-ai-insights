@@ -58,7 +58,7 @@ const BillScanner: React.FC<BillScannerProps> = ({ onScanComplete, onClose }) =>
         description: "Expense details have been extracted from the bill.",
       });
 
-      onScanComplete(extractedData);
+      onScanComplete({ ...extractedData, file }); // Pass the file object along with extracted data
     } catch (error) {
       console.error('Error processing bill:', error);
       toast({

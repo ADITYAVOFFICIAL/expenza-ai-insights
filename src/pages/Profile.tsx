@@ -145,15 +145,35 @@ const Profile = () => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
+    let oldAvatarId: string | undefined;
+
     try {
       setUpdating(true);
-      const uploadedFile = await storageService.uploadFile(file);
+
+      // Get current profile to find old avatar ID
+      const currentProfile = await authService.getUserProfile(user.$id);
+      if (currentProfile && currentProfile.avatarUrl) {
+        oldAvatarId = currentProfile.avatarUrl;
+      }
+
+      const uploadedFile = await storageService.uploadFile(file, user.$id); // Pass userId for permissions
 
       await authService.updateUserProfile(user.$id, {
         avatarUrl: uploadedFile.$id
       });
 
-      setavatarUrl(storageService.getFileView(uploadedFile.$id));
+      setavatarUrl(storageService.getFileView(uploadedFile.$id).toString()); // Ensure it's a string
+
+      // If there was an old avatar, delete it
+      if (oldAvatarId && oldAvatarId !== uploadedFile.$id) {
+        try {
+          await storageService.deleteFile(oldAvatarId);
+          console.log(`Old avatar ${oldAvatarId} deleted successfully.`);
+        } catch (deleteError) {
+          console.error("Error deleting old avatar:", deleteError);
+          // Non-critical, proceed with success toast for new avatar
+        }
+      }
 
       toast({
         title: "Success",

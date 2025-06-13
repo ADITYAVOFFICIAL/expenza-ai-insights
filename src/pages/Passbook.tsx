@@ -340,7 +340,7 @@ const Passbook = () => {
         notes: expenseFormData.notes || undefined,
         paymentMethod: (expenseFormData as any).paymentApp || undefined, // form sends paymentApp, save as paymentMethod
         bank: expenseFormData.bank || undefined,
-        billImage: expenseFormData.billImage || undefined,
+        billImage: expenseFormData.billImage, // Changed from expenseFormData.billImage || undefined
         isRecurring: expenseFormData.isRecurring || false,
         groupId: expenseFormData.groupId || undefined,
         paidBy: expenseFormData.paidBy || undefined,
@@ -371,7 +371,20 @@ const Passbook = () => {
 
     if (window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
       try {
-        await databaseService.deleteExpense(transactionId);
+        // Fetch the transaction to get the billImage ID
+        const transactionToDelete = await databaseService.getDocument(COLLECTIONS.EXPENSES, transactionId);
+        const billImageId = (transactionToDelete as unknown as Expense).billImage;
+
+        await databaseService.deleteExpense(transactionId); // Delete transaction document
+
+        if (billImageId) {
+          try {
+            await storageService.deleteFile(billImageId); // Delete associated bill image
+            console.log(`Bill image ${billImageId} deleted successfully.`);
+          } catch (fileError) {
+            console.error("Error deleting bill image from passbook context:", fileError);
+          }
+        }
         toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
         fetchData();
       } catch (error) {
@@ -624,36 +637,37 @@ const Passbook = () => {
         </TooltipProvider>
       )}
 
-      {editingTransaction && (
+       {editingTransaction && (
         <Dialog open={showEditTransactionDialog} onOpenChange={(isOpen) => {
-      setShowEditTransactionDialog(isOpen);
-      if (!isOpen) setEditingTransaction(null);
-    }}>
-      <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg">
-  <DialogHeader className="p-6 pb-4 border-b">
-    <DialogTitle>Edit Transaction</DialogTitle>
-  </DialogHeader>
-  <div className="flex-grow overflow-y-auto px-6 py-4 no-scrollbar"> {/* This makes the form itself scrollable if needed */}
-    <ExpenseForm
-            formId="edit-transaction-form"
-            onSubmit={handleUpdateSubmittedTransaction}
-            isLoading={isSubmittingEdit}
-            initialData={editingTransaction}
-            isEditing={true}
-            bankSuggestions={bankSuggestionsForEdit}
-            onDelete={handleDeleteTransaction} // Pass delete handler
-          />
-        </div>
-        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
-          <DialogClose asChild>
-              <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={isSubmittingEdit}>Cancel</Button>
-          </DialogClose>
-          <Button type="submit" form="edit-transaction-form" className="w-full sm:w-auto" disabled={isSubmittingEdit}>
-              {isSubmittingEdit ? "Updating..." : "Update Transaction"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          setShowEditTransactionDialog(isOpen);
+          if (!isOpen) setEditingTransaction(null);
+        }}>
+          <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg">
+            <DialogHeader className="p-6 pb-4 border-b">
+              <DialogTitle>Edit Transaction</DialogTitle>
+            </DialogHeader>
+            {/* The change is in the line below: changed 'flex-grow' to 'flex-1' */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 no-scrollbar">
+              <ExpenseForm
+                formId="edit-transaction-form"
+                onSubmit={handleUpdateSubmittedTransaction}
+                isLoading={isSubmittingEdit}
+                initialData={editingTransaction}
+                isEditing={true}
+                bankSuggestions={bankSuggestionsForEdit}
+                onDelete={handleDeleteTransaction}
+              />
+            </div>
+            <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
+              <DialogClose asChild>
+                <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={isSubmittingEdit}>Cancel</Button>
+              </DialogClose>
+              <Button type="submit" form="edit-transaction-form" className="w-full sm:w-auto" disabled={isSubmittingEdit}>
+                {isSubmittingEdit ? "Updating..." : "Update Transaction"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

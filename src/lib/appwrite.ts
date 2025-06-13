@@ -1,4 +1,9 @@
-import { Client, Account, Databases, Storage, Functions, ID, Query, Models } from 'appwrite';
+import { Client, Account, Databases, Storage, Functions, ID, Query, Models, Permission, Role } from 'appwrite';
+// Remove or modify the conflicting import from './config'
+// For example, if './config' only exports specific collection IDs not part of the main COLLECTIONS object, 
+// you might selectively import them, but avoid importing ID, Query, storage, DATABASE_ID, COLLECTIONS, STORAGE_BUCKET_ID from there.
+// For now, we'll assume the line below is the primary source of conflict for the reported errors and remove it.
+// import { ID, Permission, Role, Query, storage, DATABASE_ID, DATABASES, COLLECTIONS, USER_PROFILES_COLLECTION_ID, EXPENSES_COLLECTION_ID, RECURRING_EXPENSES_COLLECTION_ID, ALLOWANCES_COLLECTION_ID, GOALS_COLLECTION_ID, GROUPS_COLLECTION_ID, GROUP_EXPENSES_COLLECTION_ID, STORAGE_BUCKET_ID } from './config';
 
 const client = new Client();
 
@@ -7,21 +12,24 @@ client
   .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
 
 export const account = new Account(client);
-export const databases = new Databases(client);
-export const storage = new Storage(client);
+export const databases = new Databases(client); // This is the Databases service instance
+export const storage = new Storage(client);   // This is the Storage service instance, defined once
 export const functions = new Functions(client);
 
+// Define these constants once using environment variables
 export const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 export const COLLECTIONS = {
   USERS: import.meta.env.VITE_APPWRITE_USERS_COLLECTION_ID,
   EXPENSES: import.meta.env.VITE_APPWRITE_EXPENSES_COLLECTION_ID,
   ALLOWANCES: import.meta.env.VITE_APPWRITE_ALLOWANCES_COLLECTION_ID,
-  CATEGORIES: import.meta.env.VITE_APPWRITE_CATEGORIES_COLLECTION_ID,
+  CATEGORIES: import.meta.env.VITE_APPWRITE_CATEGORIES_COLLECTION_ID, // Ensure this env var exists if used
   RECURRING_EXPENSES: import.meta.env.VITE_APPWRITE_RECURRING_EXPENSES_COLLECTION_ID,
   GROUPS: import.meta.env.VITE_APPWRITE_GROUPS_COLLECTION_ID,
   GOALS: import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID,
-  GROUP_MEMBERS: import.meta.env.VITE_APPWRITE_GROUP_MEMBERS_COLLECTION_ID, // Assuming this exists if used
-  SPLITS: import.meta.env.VITE_APPWRITE_SPLITS_COLLECTION_ID, // Assuming this exists if used
+  GROUP_MEMBERS: import.meta.env.VITE_APPWRITE_GROUP_MEMBERS_COLLECTION_ID, 
+  SPLITS: import.meta.env.VITE_APPWRITE_SPLITS_COLLECTION_ID, 
+  // Add other collection IDs as needed
+  USER_PROFILES: import.meta.env.VITE_APPWRITE_USER_PROFILES_COLLECTION_ID, // Assuming this is the correct name for user profiles
 };
 export const STORAGE_BUCKET_ID = import.meta.env.VITE_APPWRITE_STORAGE_BUCKET_ID;
 
@@ -365,17 +373,30 @@ export const databaseService = {
 };
 
 export const storageService = {
-  async uploadFile(file: File) {
+  async uploadFile(file: File, userId?: string) {
+    const filePermissions: string[] = [];
+    if (userId) {
+      // Grant read, update, and delete permissions to the user who uploaded the file
+      filePermissions.push(Permission.read(Role.user(userId)));
+      filePermissions.push(Permission.update(Role.user(userId)));
+      filePermissions.push(Permission.delete(Role.user(userId)));
+    }
+    // If you need files to be readable by any authenticated user, you could add:
+    // filePermissions.push(Permission.read(Role.users()));
+
     return storage.createFile(
       STORAGE_BUCKET_ID,
       ID.unique(),
-      file
+      file,
+      filePermissions.length > 0 ? filePermissions : undefined // Pass permissions array
     );
   },
   async deleteFile(fileId: string) {
     return storage.deleteFile(STORAGE_BUCKET_ID, fileId);
   },
-  getFilePreview(fileId: string, width = 400, height = 400) {
+  getFilePreview(fileId: string, width?: number, height?: number) { // Make width and height optional
+    // If width and height are undefined, the Appwrite SDK's getFilePreview
+    // will not append width/height query parameters, avoiding transformation.
     return storage.getFilePreview(STORAGE_BUCKET_ID, fileId, width, height);
   },
   getFileDownload(fileId: string) {

@@ -17,7 +17,7 @@ import { toast } from '@/hooks/use-toast';
 import { storageService } from '@/lib/appwrite';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-
+import { format, parseISO, isValid } from 'date-fns';
 interface BankSuggestion {
   name: string;
   icon?: string;
@@ -55,7 +55,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     groupId: '',
     splitBetween: [] as string[],
     paidBy: user?.name || 'You', // Default to current user's name or 'You'
-    billImage: '', // Will store Appwrite file ID
+    billImage: null, // Changed from '' to null
     currency: 'INR', // Added currency from your thoughts
   });
 
@@ -75,6 +75,18 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   useEffect(() => {
     if (initialData) {
+      let dateToSet = new Date().toISOString().split('T')[0]; // Default to today in YYYY-MM-DD format
+
+      if (initialData.date) {
+        const parsedDate = parseISO(initialData.date); // Parse the ISO string
+        if (isValid(parsedDate)) {
+          dateToSet = format(parsedDate, 'yyyy-MM-dd'); // Format to YYYY-MM-DD
+        } else {
+          console.warn(`Invalid date string received in initialData.date: ${initialData.date}`);
+          // dateToSet remains the default (today's date)
+        }
+      }
+
       setFormData({
         name: initialData.name || '',
         amount: initialData.amount?.toString() || '',
@@ -82,19 +94,22 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         // Prioritize paymentMethod from initialData, then paymentApp (for legacy), then empty
         paymentApp: initialData.paymentMethod || (initialData as any).paymentApp || '', 
         bank: initialData.bank || '',
-        date: initialData.date || new Date().toISOString().split('T')[0],
+        date: dateToSet, // Use the correctly formatted date
         notes: initialData.notes || '',
         isRecurring: initialData.isRecurring || false,
         groupId: initialData.groupId || '',
         splitBetween: initialData.splitBetween || [],
         paidBy: initialData.paidBy || user?.name || 'You',
-        billImage: initialData.billImage || '',
+        billImage: initialData.billImage || null, // Changed from || '' to || null
         currency: initialData.currency || 'INR',
+        // Ensure all relevant fields from initialData are mapped here
       });
       if (initialData.billImage) {
         setBillFileToUpload(null); // Clear any staged file if initial data has an image
       }
     }
+    // If initialData is not provided, the form will use the default state values,
+    // including the default date set in useState.
   }, [initialData, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,11 +124,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       // }
     }
     
-    let uploadedBillFileId = formData.billImage; // Keep existing if not changed
-    if (billFileToUpload) {
+    // Determine the bill image ID to be saved
+    let billImageValueForSubmit: string | null = formData.billImage; // formData.billImage is now ID or null
+
+    if (billFileToUpload) { // If a new file is selected for upload
       try {
         const uploadedFile = await storageService.uploadFile(billFileToUpload);
-        uploadedBillFileId = uploadedFile.$id;
+        billImageValueForSubmit = uploadedFile.$id; // Use the new file ID
         toast({ title: "Bill Image Uploaded", description: "Receipt image saved." });
       } catch (error) {
         console.error("Error uploading bill image:", error);
@@ -121,6 +138,10 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         return; // Stop submission if bill upload fails
       }
     }
+    // If billFileToUpload is null, billImageValueForSubmit remains formData.billImage
+    // - If image was removed: formData.billImage is null, so billImageValueForSubmit is null.
+    // - If existing image kept: formData.billImage is an ID, so billImageValueForSubmit is that ID.
+    // - If no image initially: formData.billImage is null, so billImageValueForSubmit is null.
 
     const expenseData: Partial<Expense> = {
       name: formData.name,
@@ -135,8 +156,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       splitBetween: formData.splitBetween,
       paidBy: formData.paidBy,
       isSettled: initialData?.isSettled ?? (formData.splitBetween && formData.splitBetween.length > 0 ? false : true),
-      currency: formData.currency, // Consider making this dynamic based on user profile
-      billImage: uploadedBillFileId || undefined,
+      currency: formData.currency, 
+      billImage: billImageValueForSubmit, // Use the determined value (ID or null)
     };
     
     if (isEditing && initialData?.$id) {
@@ -160,7 +181,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         groupId: '',
         splitBetween: [],
         paidBy: user?.name || 'You',
-        billImage: '',
+        billImage: null, // Changed from '' to null
         currency: 'INR',
       });
       setBillFileToUpload(null);
@@ -221,7 +242,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   
   const removeBill = () => {
     setBillFileToUpload(null);
-    setFormData(prev => ({ ...prev, billImage: '' }));
+    setFormData(prev => ({ ...prev, billImage: null })); // Changed from '' to null
     if(manualBillUploadRef.current) manualBillUploadRef.current.value = ""; // Reset file input
   };
 
@@ -319,8 +340,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         </div>
 
         {/* Date and Bank Account */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
-          <div>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div> {/* Date field container */}
             <Label htmlFor="date" className="text-sm font-medium">Date *</Label>
             <div className="relative mt-1">
               <Input
@@ -359,19 +380,19 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                 <Command>
                   <CommandInput 
                     placeholder="Search bank or type new..."
-                    value={formData.bank} // Controlled input
+                    value={formData.bank} 
                     onValueChange={(searchValue) => updateFormData('bank', searchValue)}
-                />
-                <CommandList className="max-h-[250px] overflow-y-auto"> {/* Ensure these classes */}
-                  <CommandEmpty>
-                    {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
+                  />
+                  <CommandList className="max-h-[250px] overflow-y-auto"> {/* Key styling */}
+                    <CommandEmpty>
+                      {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
                     </CommandEmpty>
                     <CommandGroup>
                       {bankSuggestions.map((suggestion) => (
                         <CommandItem
                           key={suggestion.name}
-                          value={suggestion.name} // This value is used for filtering and passed to onSelect
-                          onSelect={(currentValue) => { // currentValue will be suggestion.name
+                          value={suggestion.name}
+                          onSelect={(currentValue) => {
                             updateFormData('bank', currentValue);
                             setBankPopoverOpen(false);
                           }}

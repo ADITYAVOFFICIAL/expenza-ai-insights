@@ -134,58 +134,20 @@ const AddExpense = () => {
     <div className="space-y-6 p-4 md:p-6 lg:p-8 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)} // Go back to the previous page
-          className="shrink-0"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
+  <Button
+    variant="ghost"
+    size="icon"
+    onClick={() => navigate(-1)} // Go back to the previous page
+    className="shrink-0 dark:border dark:border-accent dark:hover:bg-accent/20"
+  >
+    <ArrowLeft className="w-5 h-5 dark:text-accent" />
+  </Button>
+  <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Add New Expense</h1>
           <p className="text-muted-foreground">Record a new transaction or bill split.</p>
         </div>
       </div>
 
-      {/* Quick Actions (Optional - can be removed or adapted) */}
-      {/* 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4 cursor-pointer hover:shadow-md transition-all">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-              <Plus className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-medium">Quick Add</h3>
-              <p className="text-sm text-muted-foreground">Simple expense</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 cursor-pointer hover:shadow-md transition-all">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-              <Users className="w-5 h-5" /> 
-            </div>
-            <div>
-              <h3 className="font-medium">Split Bill</h3>
-              <p className="text-sm text-muted-foreground">Share with friends</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 cursor-pointer hover:shadow-md transition-all">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-              <Repeat className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-medium">Recurring</h3>
-              <p className="text-sm text-muted-foreground">Set up auto-expense</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-      */}
 
       {/* Main Form */}
       <Card>

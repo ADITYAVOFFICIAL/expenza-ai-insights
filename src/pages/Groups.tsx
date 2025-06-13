@@ -65,21 +65,21 @@ const Groups = () => {
     setIsLoading(true);
     try {
       const groupResponse = await databaseService.getGroups(user.$id);
-      const fetchedGroupsPromises = groupResponse.documents.map(async (doc) => {
-        const groupDoc = doc as Group;
-        let totalExpenses = 0;
-        let recentExpenses: GroupExpense[] = [];
-        let displayAvatarUrl: string | undefined = undefined;
+  const fetchedGroupsPromises = groupResponse.documents.map(async (doc) => {
+    const groupDoc = doc as Group;
+    let totalExpenses = 0;
+    let recentExpenses: GroupExpense[] = [];
+    let displayAvatarUrl: string | undefined = undefined;
 
-        if (groupDoc.avatarUrl) {
-          try {
-            displayAvatarUrl = storageService.getFilePreview(groupDoc.avatarUrl, 100, 100).toString();
-          } catch (e) {
-            console.warn("Failed to get avatar preview for group:", groupDoc.name, e)
-          }
-        }
+    if (groupDoc.avatarUrl) {
+      try {
+        displayAvatarUrl = storageService.getFilePreview(groupDoc.avatarUrl).toString(); // Remove width and height arguments
+      } catch (e) {
+        console.warn("Failed to get avatar preview for group:", groupDoc.name, e)
+      }
+    }
 
-        try {
+    try {
           const expenseResponse = await databaseService.getGroupExpenses(groupDoc.$id, 50);
           recentExpenses = expenseResponse.documents.slice(0, 3).map(exDoc => ({
             ...exDoc,
