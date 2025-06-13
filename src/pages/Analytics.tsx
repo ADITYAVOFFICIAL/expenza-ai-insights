@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { TrendingUp, Calendar, Filter, Download, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BankChart from '@/components/charts/BankChart';
 import SavingsCategoryChart from '@/components/charts/SavingsCategoryChart';
 import SavingsTrackingChart from '@/components/charts/SavingsTrackingChart';
+import ExpenseChart from '@/components/charts/ExpenseChart'; // Assuming this is used for bank expenses/allowances
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService } from '@/lib/appwrite';
@@ -34,7 +35,7 @@ import {
   endOfDay,
 } from 'date-fns';
 import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
-
+import { useIsMobile } from '@/hooks/use-mobile'; // Add this if not already present
 interface MonthlyTrend {
   month: string;
   expenses: number;
@@ -67,11 +68,12 @@ interface SavingsDataPoint { // From SavingsTrackingChart
   period: string;
   saved: number;
   target: number;
-  difference?: number; // Optional, calculated in chart
+  difference: number; // Make it non-optional here as the chart expects it
 }
 
 
 const Analytics = () => {
+  const isMobile = useIsMobile(); // Add this if not already present
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -386,9 +388,11 @@ const Analytics = () => {
     // Savings Chart Data (based on Goals) - This logic remains largely the same
     const monthlySavingsData: SavingsDataPoint[] = goals.map(goal => ({
         period: goal.name || `Goal ${goal.$id?.substring(0,5)}`, // Use optional chaining for $id
-        saved: goal.currentAmount, target: goal.targetAmount,
+        saved: goal.currentAmount,
+        target: goal.targetAmount,
+        difference: goal.targetAmount - goal.currentAmount, // Calculate the difference
     }));
-    // TODO: Implement weekly savings data if needed, for now, it's empty
+    // TODO: Implement weekly savings data if needed, for now, it's empty or also calculate difference
     setSavingsChartData({ weekly: [], monthly: monthlySavingsData });
 
     // Savings Category Chart Data (Spending by category, for chart that shows categories)
@@ -509,14 +513,14 @@ const Analytics = () => {
           <CardContent id="analyticsChartExpensesByBank"> {/* ID for chart capture */}
             {expenseByBank.length > 0 ? <BankChart data={expenseByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank expense data.</p>}
             {expenseByBank.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
                 {expenseByBank.map((bank) => (
-                  <div key={bank.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bank.color }}></div>
-                      <span className="truncate">{bank.name}</span>
+                  <div key={bank.name} className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: bank.color }}></div>
+                      <span className="truncate flex-grow">{bank.name}</span>
                     </div>
-                    <span className="font-medium">{bank.percentage}%</span>
+                    <span className="font-medium shrink-0 ml-2">{bank.percentage?.toFixed(1)}%</span>
                   </div>
                 ))}
               </div>
@@ -531,14 +535,14 @@ const Analytics = () => {
           <CardContent id="analyticsChartAllowanceByBank"> {/* ID for chart capture */}
             {allowanceByBank.length > 0 ? <BankChart data={allowanceByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank allowance data.</p>}
              {allowanceByBank.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
                 {allowanceByBank.map((bank) => (
-                    <div key={bank.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: bank.color }}></div>
-                        <span className="truncate">{bank.name}</span>
+                    <div key={bank.name} className="flex items-center justify-between text-xs sm:text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: bank.color }}></div>
+                        <span className="truncate flex-grow">{bank.name}</span>
                     </div>
-                    <span className="font-medium">{bank.percentage}%</span>
+                    <span className="font-medium shrink-0 ml-2">{bank.percentage?.toFixed(1)}%</span>
                     </div>
                 ))}
                 </div>
@@ -558,27 +562,29 @@ const Analytics = () => {
           </CardHeader>
           <CardContent id="analyticsChartFinancialTrends"> {/* ID for chart capture */}
             {monthlyTrends.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyTrends}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" className="text-xs" />
-                  <YAxis className="text-xs" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)]}
-                    labelStyle={{color: 'hsl(var(--foreground))'}}
-                    contentStyle={{
-                    backgroundColor: 'hsl(var(--background))', 
-                    border: '1px solid hsl(var(--border))', 
-                    borderRadius: 'var(--radius)',
-                    color: 'hsl(var(--foreground))',
-                }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="income" stroke="#3b82f6" name="Income" />
-                  <Line type="monotone" dataKey="expenses" stroke="#ef4444" name="Expenses" />
-                  <Line type="monotone" dataKey="savings" stroke="#10b981" name="Savings" />
-                </LineChart>
-              </ResponsiveContainer>
+              <div id="analyticsChartFinancialTrends"> {/* ID for capturing */}
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={monthlyTrends}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="month" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)]}
+                      labelStyle={{color: 'hsl(var(--foreground))'}}
+                      contentStyle={{
+                      backgroundColor: 'hsl(var(--background))', 
+                      border: '1px solid hsl(var(--border))', 
+                      borderRadius: 'var(--radius)',
+                      color: 'hsl(var(--foreground))',
+                  }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="income" stroke="#3b82f6" name="Income" />
+                    <Line type="monotone" dataKey="expenses" stroke="#ef4444" name="Expenses" />
+                    <Line type="monotone" dataKey="savings" stroke="#22c55e" name="Savings" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             ) : <p className="text-muted-foreground text-center py-8">No trend data available.</p>}
           </CardContent>
         </Card>

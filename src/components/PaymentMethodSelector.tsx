@@ -51,7 +51,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ value, on
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
           <CommandInput placeholder="Search payment method..." />
-          <CommandList>
+          <CommandList className="max-h-[250px] overflow-y-auto">
             <CommandEmpty>No payment method found.</CommandEmpty>
             <CommandGroup>
               {apps.map((app) => {

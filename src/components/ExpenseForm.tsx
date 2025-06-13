@@ -29,7 +29,8 @@ interface ExpenseFormProps {
   initialData?: Partial<Expense>;
   isEditing?: boolean;
   onDelete?: (expenseId: string) => void;
-  bankSuggestions?: BankSuggestion[]; // Add new prop
+  bankSuggestions?: BankSuggestion[];
+  formId?: string; // Add formId prop
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ 
@@ -38,7 +39,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   initialData,
   isEditing = false,
   onDelete,
-  bankSuggestions = [] // Add new prop with default
+  bankSuggestions = [],
+  formId // Destructure formId
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -227,15 +229,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   return (
     <div className="space-y-4 lg:space-y-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {isEditing && initialData?.$id && (
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl lg:text-2xl font-bold text-foreground">Edit Expense</h2>
+      <form id={formId || "expense-form"} onSubmit={handleSubmit} className="space-y-4">
+        {isEditing && initialData?.$id && onDelete && (
+          <div className="flex items-center justify-end mb-2"> {/* Adjusted: Removed h2, using justify-end for delete button */}
             <Button
               type="button"
               variant="destructive"
               size="sm"
-              onClick={internalHandleDelete} // Changed to internalHandleDelete
+              onClick={internalHandleDelete}
               className="flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
@@ -475,16 +476,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           <Label htmlFor="recurring" className="text-sm font-medium">Make this a recurring expense</Label>
         </div>
 
+        {/* REMOVED The submit button from here, it will be in DialogFooter */}
+        {/* 
         <div className="flex gap-3 pt-4">
           <Button type="submit" disabled={isLoading} className="flex-1">
             {isLoading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Expense' : 'Add Expense')}
           </Button>
-          {/* {!isEditing && ( // Save as Draft functionality can be added later
-            <Button type="button" variant="outline" disabled={isLoading}>
-              Save as Draft
-            </Button>
-          )} */}
-        </div>
+        </div> 
+        */}
       </form>
     </div>
   );

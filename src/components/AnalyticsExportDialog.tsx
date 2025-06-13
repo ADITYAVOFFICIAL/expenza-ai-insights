@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Download, FileText, FileSpreadsheet, X, Check, Loader2,Square, Settings2, Image as ImageIcon, BarChart3, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, ListChecks, Banknote, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
-import { Expense } from '@/types/expense';
-import { Allowance } from '@/lib/allowanceService';
-// import { Goal } from '@/types/goal'; // Not directly used in this component's data processing
-import { Download, FileText, Image as ImageIcon, CheckSquare, Square } from 'lucide-react';
-import jsPDF from 'jspdf';
-import ExcelJS from 'exceljs';
-import html2canvas from 'html2canvas';
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Expense } from '@/types/expense'; // Assuming Expense type is imported
+import { Allowance } from '@/lib/allowanceService'; // Assuming Allowance type is imported
+import { Goal } from '@/types/goal'; // Assuming Goal type is imported
+import { toast } from '@/hooks/use-toast'; // Changed useToast to toast
+import { useIsMobile } from '@/hooks/use-mobile';
+import ExcelJS from 'exceljs'; // Added ExcelJS import
+import { format, parseISO } from 'date-fns'; // Added parseISO and format
+import jsPDF from 'jspdf'; // Added jsPDF import
+import 'jspdf-autotable';
+import html2canvas from 'html2canvas'; // For capturing charts as images
 // Data structure interfaces (assuming these are consistent with Analytics.tsx)
 interface MonthlyTrend {
   month: string;
@@ -49,15 +52,20 @@ export interface AnalyticsExportableData {
   allowanceByBank: BankData[];
   allExpenses: Expense[];
   timeFilterLabel: string;
+  // You can add more optional fields here if needed for different types of exports
+  // e.g., paymentAppUsage?: Array<any>;
+  // e.g., topExpenses?: Array<any>;
 }
 
 interface AnalyticsExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   analyticsData: AnalyticsExportableData | null;
+  customChartConfigs?: Array<{ id: string; title: string }>;
+  customDataSetOptions?: Array<{ id: string; label: string; defaultSelected?: boolean }>;
 }
 
-const dataSetOptions = [
+const defaultDataSetOptions = [
   { id: 'summaryMetrics', label: 'Summary Metrics' },
   { id: 'monthlyTrends', label: 'Monthly Trends (Income, Expenses, Savings)' },
   { id: 'categorySpending', label: 'Spending by Category' },
@@ -112,14 +120,25 @@ const downloadFile = (blob: Blob, filename: string): void => {
   }
 };
 
-const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onOpenChange, analyticsData }) => {
-  const [selectedDataSets, setSelectedDataSets] = useState<string[]>(dataSetOptions.map(opt => opt.id));
+const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
+  open,
+  onOpenChange,
+  analyticsData,
+  customChartConfigs,
+  customDataSetOptions,
+}) => {
+  const effectiveDataSetOptions = customDataSetOptions || defaultDataSetOptions;
+  const effectiveChartConfigs = customChartConfigs || chartConfigs;
+
+  const [selectedDataSets, setSelectedDataSets] = useState<string[]>(
+    effectiveDataSetOptions.filter(opt => opt.defaultSelected !== false).map(opt => opt.id)
+  );
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'xlsx'>('csv');
   const [includeGraphs, setIncludeGraphs] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const handleSelectAllDataSets = (checked: boolean) => {
-    setSelectedDataSets(checked ? dataSetOptions.map(opt => opt.id) : []);
+    setSelectedDataSets(checked ? effectiveDataSetOptions.map(opt => opt.id) : []);
   };
 
   const handleDataSetChange = (dataSetId: string, checked: boolean) => {
@@ -183,7 +202,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
     }
     if (selectedDataSets.includes('allExpenses') && analyticsData.allExpenses) {
       const expensesToExport = analyticsData.allExpenses.map(exp => ({
-        Date: exp.date, Name: exp.name, Amount: exp.amount, Category: exp.category,
+        Date: exp.date ? format(parseISO(exp.date), 'dd/MM/yy') : '', Name: exp.name, Amount: exp.amount, Category: exp.category,
         PaymentMethod: exp.paymentMethod, Bank: exp.bank || '', Notes: exp.notes || '', CreatedAt: exp.createdAt,
       }));
       combinedCsvString += convertToCSV(expensesToExport, "Detailed Expense List");
@@ -196,95 +215,194 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
   const exportToPDFHandler = async () => {
     if (!analyticsData) return;
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    let yPos = 15; // Initial Y position
+    let yPos = 20; // Initial Y position with more top margin
+    const pageMargin = 15;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const contentWidth = pageWidth - 2 * pageMargin;
+    const generationDate = new Date().toLocaleDateString();
 
-    pdf.setFontSize(18);
-    pdf.text('Expenza Analytics Report', 105, yPos, { align: 'center' });
-    yPos += 8;
+    // --- Theme Colors (approximated from HSL values) ---
+    const primaryColor = [51, 153, 102]; // Approx. hsl(150, 60%, 45%)
+    const foregroundColor = [20, 23, 28]; // Approx. hsl(220, 20%, 10%)
+    const mutedForegroundColor = [97, 106, 124]; // Approx. hsl(220, 15%, 45%)
+    const whiteColor = [255, 255, 255];
+
+    // --- Helper function to add footer with page number ---
+    const addFooter = () => {
+      const pageCount = pdf.internal.getNumberOfPages();
+      pdf.setFontSize(8);
+      pdf.setTextColor(mutedForegroundColor[0], mutedForegroundColor[1], mutedForegroundColor[2]);
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.text(
+          `Page ${i} of ${pageCount} | Generated on: ${generationDate} | Expenza Analytics`,
+          pageMargin,
+          pdf.internal.pageSize.getHeight() - 10
+        );
+      }
+    };
+
+    // --- Report Header ---
+    pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    pdf.rect(0, 0, pageWidth, 30, 'F'); // Header background banner
+
+    pdf.setFontSize(22);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(whiteColor[0], whiteColor[1], whiteColor[2]);
+    pdf.text('Expenza Analytics Report', pageWidth / 2, 15, { align: 'center' });
+
     pdf.setFontSize(10);
-    pdf.text(`Time Period: ${analyticsData.timeFilterLabel}`, 105, yPos, { align: 'center' });
-    yPos += 5;
-    pdf.text(`Export Date: ${new Date().toLocaleDateString()}`, 105, yPos, { align: 'center' });
-    yPos += 10;
+    pdf.setTextColor(whiteColor[0], whiteColor[1], whiteColor[2]);
+    pdf.text(`Period: ${analyticsData.timeFilterLabel}`, pageWidth / 2, 23, { align: 'center' });
+    
+    yPos = 40; // Reset Y position after header
 
-    const addSectionToPdf = (title: string, data: any[]) => {
+    // --- Function to add a section with styled title and table ---
+    const addSectionToPdf = (title: string, data: any[], columns?: string[]) => {
       if (data.length === 0) return;
-      if (yPos > 260) { pdf.addPage(); yPos = 15; } // Check for page break
-      pdf.setFontSize(14);
-      pdf.text(title, 10, yPos);
-      yPos += 7;
-      pdf.setFontSize(9);
-      // @ts-ignore // jsPDF-AutoTable is not strictly typed here, or use a simpler table
+      if (yPos > pdf.internal.pageSize.getHeight() - 40) { // Check for page break before section title
+        pdf.addPage();
+        yPos = pageMargin;
+      }
+
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      pdf.text(title, pageMargin, yPos);
+      yPos += 8;
+
+      if (yPos > pdf.internal.pageSize.getHeight() - 30) { // Check for page break before table
+          pdf.addPage();
+          yPos = pageMargin;
+      }
+      
+      // @ts-ignore
       if (typeof pdf.autoTable === 'function') {
+        // @ts-ignore
         pdf.autoTable({
-            head: [Object.keys(data[0])],
-            body: data.map(row => Object.values(row)),
-            startY: yPos,
-            theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 1.5 },
-            headStyles: { fillColor: [22, 160, 133], fontSize: 9 },
-            margin: { top: yPos + 5 }
+          head: [columns || Object.keys(data[0])],
+          body: data.map(row => Object.values(row)),
+          startY: yPos,
+          theme: 'grid', // 'striped', 'grid', 'plain'
+          styles: {
+            fontSize: 9,
+            cellPadding: 2,
+            textColor: foregroundColor,
+            lineColor: [200, 200, 200], // Lighter grid lines
+            lineWidth: 0.1,
+          },
+          headStyles: {
+            fillColor: primaryColor,
+            textColor: whiteColor,
+            fontStyle: 'bold',
+            fontSize: 10,
+            halign: 'center',
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245], // Light gray for alternate rows
+          },
+          margin: { left: pageMargin, right: pageMargin },
+          tableWidth: contentWidth, // Ensure table uses content width
+          didDrawPage: (hookData: any) => { // Handle page breaks within table
+            // yPos = hookData.cursor.y + 5; // Not reliable for setting next element's yPos
+          }
         });
         // @ts-ignore
         yPos = pdf.lastAutoTable.finalY + 10;
-      } else { // Fallback for simple text if autoTable is not available/configured
+      } else {
+        pdf.setFontSize(9);
+        pdf.setTextColor(foregroundColor[0], foregroundColor[1], foregroundColor[2]);
         data.forEach(row => {
-            if (yPos > 270) { pdf.addPage(); yPos = 15; }
-            pdf.text(Object.values(row).join(' | '), 10, yPos);
-            yPos += 5;
+          if (yPos > pdf.internal.pageSize.getHeight() - 20) { pdf.addPage(); yPos = pageMargin; }
+          pdf.text(Object.values(row).map(val => String(val).substring(0,30)).join(' | '), pageMargin, yPos); // Truncate long values
+          yPos += 6;
         });
         yPos += 5;
       }
     };
     
-    // Add textual data
+    // --- Add Textual Data Sections ---
+    pdf.setTextColor(foregroundColor[0], foregroundColor[1], foregroundColor[2]); // Default text color
+
     if (selectedDataSets.includes('summaryMetrics') && analyticsData.summaryMetrics.length > 0) {
-        addSectionToPdf("Summary Metrics", analyticsData.summaryMetrics.map(m => ({ Metric: m.label, Value: m.value, Details: m.description || '' })));
+      addSectionToPdf("Summary Metrics", analyticsData.summaryMetrics.map(m => ({ Metric: m.label, Value: m.value, Details: m.description || '' })));
     }
-    // ... Add other textual data sections similarly ...
-    if (selectedDataSets.includes('monthlyTrends') && analyticsData.monthlyTrends.length > 0) addSectionToPdf("Monthly Trends", analyticsData.monthlyTrends);
-    if (selectedDataSets.includes('categorySpending') && analyticsData.categorySpending.length > 0) addSectionToPdf("Spending by Category", analyticsData.categorySpending.map(c => ({ Category: c.category, Amount: c.amount, Percentage: c.percentage || ''})));
-    if (selectedDataSets.includes('dailySpending') && analyticsData.dailySpending.length > 0) addSectionToPdf("Daily Spending Trend", analyticsData.dailySpending);
-    if (selectedDataSets.includes('expenseByBank') && analyticsData.expenseByBank.length > 0) addSectionToPdf("Expenses by Bank", analyticsData.expenseByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage || ''})));
-    if (selectedDataSets.includes('allowanceByBank') && analyticsData.allowanceByBank.length > 0) addSectionToPdf("Allowances by Bank", analyticsData.allowanceByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage || ''})));
+    if (selectedDataSets.includes('monthlyTrends') && analyticsData.monthlyTrends.length > 0) {
+      addSectionToPdf("Financial Trends", analyticsData.monthlyTrends);
+    }
+    if (selectedDataSets.includes('categorySpending') && analyticsData.categorySpending.length > 0) {
+      addSectionToPdf("Spending by Category", analyticsData.categorySpending.map(c => ({ Category: c.category, Amount: `₹${Number(c.amount).toLocaleString()}`, Percentage: `${c.percentage || 0}%` })));
+    }
+    if (selectedDataSets.includes('dailySpending') && analyticsData.dailySpending.length > 0) {
+      addSectionToPdf("Daily Spending Trend", analyticsData.dailySpending.map(d => ({ Day: d.day, Amount: `₹${Number(d.amount).toLocaleString()}` })));
+    }
+    if (selectedDataSets.includes('expenseByBank') && analyticsData.expenseByBank.length > 0) {
+      addSectionToPdf("Expenses by Bank", analyticsData.expenseByBank.map(b => ({ Bank: b.name, Amount: `₹${Number(b.value).toLocaleString()}`, Percentage: `${b.percentage || 0}%` })));
+    }
+    if (selectedDataSets.includes('allowanceByBank') && analyticsData.allowanceByBank.length > 0) {
+      addSectionToPdf("Allowances by Bank", analyticsData.allowanceByBank.map(b => ({ Bank: b.name, Amount: `₹${Number(b.value).toLocaleString()}`, Percentage: `${b.percentage || 0}%` })));
+    }
     if (selectedDataSets.includes('allExpenses') && analyticsData.allExpenses.length > 0) {
-        const expensesToExport = analyticsData.allExpenses.map(exp => ({
-            Date: exp.date, Name: exp.name, Amount: exp.amount, Category: exp.category,
-            Payment: exp.paymentMethod, Bank: exp.bank || '', Notes: exp.notes || '',
-        }));
-        addSectionToPdf("Detailed Expense List", expensesToExport);
+      const expensesToExport = analyticsData.allExpenses.map(exp => ({
+        Date: exp.date ? format(parseISO(exp.date), 'dd/MM/yy') : '', Name: exp.name, Amount: `₹${Number(exp.amount).toLocaleString()}`, Category: exp.category,
+        Payment: exp.paymentMethod, Bank: exp.bank || 'N/A', Notes: exp.notes || '',
+      }));
+      addSectionToPdf("Detailed Expense List", expensesToExport, ['Date', 'Name', 'Amount', 'Category', 'Payment', 'Bank', 'Notes']);
     }
 
-
-    if (includeGraphs) {
-      pdf.addPage();
-      yPos = 15;
-      pdf.setFontSize(16);
-      pdf.text('Charts', 105, yPos, { align: 'center' });
+    // --- Add Charts Section ---
+    if (includeGraphs && effectiveChartConfigs.length > 0) {
+      if (yPos > pdf.internal.pageSize.getHeight() - 60) { // Check space before "Charts" title
+         pdf.addPage(); yPos = pageMargin;
+      } else {
+        yPos += 5; // Some spacing if on same page
+      }
+      
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      pdf.text('Visualizations', pageMargin, yPos);
       yPos += 10;
 
-      for (const chart of chartConfigs) {
-        if (yPos > 200) { pdf.addPage(); yPos = 15; } // Check for page break before adding chart
+      for (const chart of effectiveChartConfigs) {
+        if (yPos > pdf.internal.pageSize.getHeight() - 80) { // Check space for chart title + chart
+          pdf.addPage(); yPos = pageMargin;
+        }
         const imageDataUrl = await captureChartAsImage(chart.id);
         if (imageDataUrl) {
           pdf.setFontSize(12);
-          pdf.text(chart.title, 10, yPos);
-          yPos += 5;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setTextColor(foregroundColor[0], foregroundColor[1], foregroundColor[2]);
+          pdf.text(chart.title, pageMargin, yPos);
+          yPos += 7;
+
           const imgProps = pdf.getImageProperties(imageDataUrl);
-          const pdfWidth = pdf.internal.pageSize.getWidth() - 20; // Page width with margin
-          const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+          const chartWidth = contentWidth; 
+          const chartHeight = (imgProps.height * chartWidth) / imgProps.width;
           
-          if (yPos + pdfHeight > 280 && yPos !== 15) { // If not enough space and not top of new page
-             pdf.addPage(); yPos = 15;
+          if (yPos + chartHeight > pdf.internal.pageSize.getHeight() - 20) { // Check if chart fits
+             pdf.addPage(); yPos = pageMargin;
+             // Re-add chart title on new page
              pdf.setFontSize(12);
-             pdf.text(chart.title, 10, yPos);
-             yPos += 5;
+             pdf.setFont('helvetica', 'bold');
+             pdf.setTextColor(foregroundColor[0], foregroundColor[1], foregroundColor[2]);
+             pdf.text(chart.title, pageMargin, yPos);
+             yPos += 7;
           }
-          pdf.addImage(imageDataUrl, 'PNG', 10, yPos, pdfWidth, pdfHeight);
-          yPos += pdfHeight + 10;
+          try {
+            pdf.addImage(imageDataUrl, 'PNG', pageMargin, yPos, chartWidth, chartHeight);
+            yPos += chartHeight + 15; // Space after chart
+          } catch (e) {
+            console.error("Error adding image to PDF: ", e);
+            pdf.setTextColor(255,0,0);
+            pdf.text(`Error rendering chart: ${chart.title}`, pageMargin, yPos);
+            yPos += 10;
+          }
         }
       }
     }
+    
+    addFooter(); // Add footer to all pages
     pdf.save(getFilename('pdf'));
   };
 
@@ -295,56 +413,107 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
     workbook.created = new Date();
     workbook.modified = new Date();
 
+    const primaryColorArgb = 'FF339966'; // ARGB for primaryColor [51, 153, 102]
+    const whiteColorArgb = 'FFFFFFFF';
+
     const addSheetWithData = (sheetName: string, data: any[]) => {
       if (data.length === 0) return;
-      const worksheet = workbook.addWorksheet(sheetName.substring(0, 30)); // Max 31 chars for sheet name
-      worksheet.columns = Object.keys(data[0]).map(key => ({ header: key, key: key, width: 20 }));
-      worksheet.addRows(data);
-      // Style header
-      worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      worksheet.getRow(1).fill = { type: 'pattern', pattern:'solid', fgColor:{argb:'FF228B22'} }; // Green fill
+      const worksheet = workbook.addWorksheet(sheetName.substring(0, 30)); 
+      
+      // Add title for the sheet
+      worksheet.mergeCells('A1', `${String.fromCharCode(65 + Object.keys(data[0]).length -1)}1`);
+      worksheet.getCell('A1').value = sheetName;
+      worksheet.getCell('A1').font = { name: 'Arial', size: 16, bold: true, color: { argb: primaryColorArgb } };
+      worksheet.getCell('A1').alignment = { horizontal: 'center' };
+      worksheet.getRow(1).height = 20;
+
+      // Add headers
+      worksheet.columns = Object.keys(data[0]).map(key => ({ 
+        header: key.replace(/([A-Z])/g, ' $1').trim(), // Add space before caps for readability
+        key: key, 
+        width: key.toLowerCase().includes('name') || key.toLowerCase().includes('notes') ? 30 : (key.toLowerCase().includes('date') ? 15 : 20),
+        style: { font: { name: 'Arial', size: 10 } }
+      }));
+      
+      // Style header row (now row 2)
+      const headerRow = worksheet.getRow(2);
+      headerRow.values = Object.keys(data[0]).map(key => key.replace(/([A-Z])/g, ' $1').trim()); // Spaced headers
+      headerRow.font = { name: 'Arial', bold: true, color: { argb: whiteColorArgb }, size: 11 };
+      headerRow.fill = { type: 'pattern', pattern:'solid', fgColor:{argb: primaryColorArgb } };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 18;
+
+      // Add data rows starting from row 3
+      data.forEach(item => {
+        const row = worksheet.addRow(Object.values(item));
+        row.font = { name: 'Arial', size: 10 };
+        // Apply number formatting for amounts/percentages
+        Object.keys(item).forEach((key, colIndex) => {
+            const cell = row.getCell(colIndex + 1);
+            if (typeof item[key] === 'number') {
+                if (key.toLowerCase().includes('amount') || key.toLowerCase().includes('value')) {
+                    cell.numFmt = '"₹"#,##0.00';
+                } else if (key.toLowerCase().includes('percentage')) {
+                    cell.numFmt = '0.00"%"';
+                    cell.value = item[key] / 100; // Store percentage as decimal for Excel
+                }
+            } else if (String(item[key]).startsWith('₹')) {
+                 cell.numFmt = '"₹"#,##0.00';
+                 cell.value = parseFloat(String(item[key]).replace('₹','').replace(/,/g,''));
+            } else if (String(item[key]).endsWith('%')) {
+                 cell.numFmt = '0.00"%"';
+                 cell.value = parseFloat(String(item[key]).replace('%','')) / 100;
+            }
+        });
+      });
+      
+      // Auto-filter on header row
+      worksheet.autoFilter = `A2:${String.fromCharCode(65 + Object.keys(data[0]).length -1)}2`;
     };
 
     // Add textual data to sheets
     if (selectedDataSets.includes('summaryMetrics') && analyticsData.summaryMetrics.length > 0) addSheetWithData("Summary Metrics", analyticsData.summaryMetrics.map(m => ({ Metric: m.label, Value: m.value, Details: m.description || '' })));
-    // ... Add other textual data sections similarly ...
-    if (selectedDataSets.includes('monthlyTrends') && analyticsData.monthlyTrends.length > 0) addSheetWithData("Monthly Trends", analyticsData.monthlyTrends);
-    if (selectedDataSets.includes('categorySpending') && analyticsData.categorySpending.length > 0) addSheetWithData("Category Spending", analyticsData.categorySpending.map(c => ({ Category: c.category, Amount: c.amount, Percentage: c.percentage || ''})));
+    if (selectedDataSets.includes('monthlyTrends') && analyticsData.monthlyTrends.length > 0) addSheetWithData("Financial Trends", analyticsData.monthlyTrends);
+    if (selectedDataSets.includes('categorySpending') && analyticsData.categorySpending.length > 0) addSheetWithData("Spending by Category", analyticsData.categorySpending.map(c => ({ Category: c.category, Amount: c.amount, Percentage: c.percentage })));
     if (selectedDataSets.includes('dailySpending') && analyticsData.dailySpending.length > 0) addSheetWithData("Daily Spending", analyticsData.dailySpending);
-    if (selectedDataSets.includes('expenseByBank') && analyticsData.expenseByBank.length > 0) addSheetWithData("Expense By Bank", analyticsData.expenseByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage || ''})));
-    if (selectedDataSets.includes('allowanceByBank') && analyticsData.allowanceByBank.length > 0) addSheetWithData("Allowance By Bank", analyticsData.allowanceByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage || ''})));
+    if (selectedDataSets.includes('expenseByBank') && analyticsData.expenseByBank.length > 0) addSheetWithData("Expense By Bank", analyticsData.expenseByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage })));
+    if (selectedDataSets.includes('allowanceByBank') && analyticsData.allowanceByBank.length > 0) addSheetWithData("Allowance By Bank", analyticsData.allowanceByBank.map(b => ({ Bank: b.name, Amount: b.value, Percentage: b.percentage })));
     if (selectedDataSets.includes('allExpenses') && analyticsData.allExpenses.length > 0) {
         const expensesToExport = analyticsData.allExpenses.map(exp => ({
-            Date: exp.date, Name: exp.name, Amount: exp.amount, Category: exp.category,
-            Payment: exp.paymentMethod, Bank: exp.bank || '', Notes: exp.notes || '', CreatedAt: exp.createdAt,
+            Date: exp.date ? format(parseISO(exp.date), 'dd/MM/yy') : '', Name: exp.name, Amount: exp.amount, Category: exp.category,
+            PaymentMethod: exp.paymentMethod, Bank: exp.bank || 'N/A', Notes: exp.notes || '', CreatedAt: exp.$createdAt,
         }));
-        addSheetWithData("All Expenses", expensesToExport);
+        addSheetWithData("All Expenses Data", expensesToExport);
     }
-
-    if (includeGraphs) {
+    
+    // --- Add Charts to Excel (if selected) ---
+    if (includeGraphs && effectiveChartConfigs.length > 0) {
       const chartsSheet = workbook.addWorksheet('Charts');
       let currentRow = 1;
-      for (const chart of chartConfigs) {
+      for (const chart of effectiveChartConfigs) {
         const imageDataUrl = await captureChartAsImage(chart.id);
         if (imageDataUrl) {
           chartsSheet.getCell(`A${currentRow}`).value = chart.title;
-          chartsSheet.getRow(currentRow).font = { bold: true, size: 14 };
+          chartsSheet.getRow(currentRow).font = { name: 'Arial', bold: true, size: 14, color: { argb: primaryColorArgb } };
           currentRow +=1;
 
-          const imageBase64 = imageDataUrl.split(',')[1]; // Get base64 part
+          const imageBase64 = imageDataUrl.split(',')[1];
           const imageId = workbook.addImage({
             base64: imageBase64,
             extension: 'png',
           });
-          // Approximate image size. ExcelJS uses EMU. 1 inch = 914400 EMU. 96 DPI.
-          // Width of ~15 Excel columns, Height ~25 rows. This is very approximate.
+          
+          // Approximate image size. ExcelJS uses EMU. 1 inch = 914400 EMU.
+          // Let's aim for a width of about 10 columns and height of 20 rows.
+          // These are rough estimates and might need adjustment.
+          // A common approach is to set width/height in pixels and convert, or use cell anchors.
+          // For simplicity, we'll use cell anchors to span a certain number of rows/columns.
           chartsSheet.addImage(imageId, {
-            tl: { col: 0, row: currentRow }, // Top-left corner
-            // ext: { width: 500, height: 300 } // Define image size in pixels
-            // Or use br (bottom-right corner) to span cells
-            br: { col: 10, row: currentRow + 20 } // Span 10 columns and 20 rows
+            tl: { col: 0, row: currentRow }, // Top-left corner (0-indexed)
+            // ext: { width: 600, height: 400 } // Define image size in pixels
+             br: { col: 12, row: currentRow + 25 } // Bottom-right corner (spans 12 cols, 25 rows)
           });
-          currentRow += 22; // Move down for next chart
+          currentRow += 27; // Move down for next chart + title
         }
       }
     }
@@ -390,7 +559,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
     }
   };
 
-  const allDataSetsSelected = selectedDataSets.length === dataSetOptions.length;
+  const allDataSetsSelected = selectedDataSets.length === effectiveDataSetOptions.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -400,6 +569,9 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
             <Download className="w-5 h-5" />
             Export Analytics Data
           </DialogTitle>
+          <DialogDescription>
+            Select the format, data sets, and options for exporting your analytics report.
+          </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-6">
           <div>
@@ -425,7 +597,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
                 </Button>
             </div>
             <div className="space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md">
-              {dataSetOptions.map(option => (
+              {effectiveDataSetOptions.map(option => ( // Use effectiveDataSetOptions
                 <div key={option.id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`cb-export-${option.id}`}

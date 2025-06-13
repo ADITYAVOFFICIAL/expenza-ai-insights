@@ -743,14 +743,18 @@ const Recurring = () => {
             }
           }}
         >
-            <DialogContent className="text-foreground"> {/* Added text-foreground */}
-                <DialogHeader>
+            <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg"> {/* Modified */}
+                <DialogHeader className="p-6 pb-4 border-b">
                   <DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle>
                 </DialogHeader>
-                {renderRecurringForm(editFormState, setEditFormState, 'edit')}
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline" disabled={processingAction === editingExpenseId}>Cancel</Button></DialogClose>
-                    <Button onClick={handleUpdateRecurring} disabled={processingAction === editingExpenseId}>
+                <div className="flex-grow overflow-y-auto px-6 py-4">
+                  {renderRecurringForm(editFormState, setEditFormState, 'edit')}
+                </div>
+                <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
+                    <DialogClose asChild>
+                        <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={processingAction === editingExpenseId}>Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleUpdateRecurring} className="w-full sm:w-auto" disabled={processingAction === editingExpenseId}>
                         {processingAction === editingExpenseId ? "Saving..." : "Save Changes"}
                     </Button>
                 </DialogFooter>

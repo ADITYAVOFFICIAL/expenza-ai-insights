@@ -1,5 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { FileText, Download, Calendar, Filter, TrendingUp, DollarSign, AlertTriangle, Banknote } from 'lucide-react';
+import {
+  FileText,
+  Download,
+  Calendar,
+  Filter,
+  TrendingUp,
+  DollarSign,
+  AlertTriangle,
+  Banknote,
+  BarChart2,
+  PieChart as PieIcon,
+  ListChecks, // Added for "All Categories"
+  CreditCard,
+  Tag, // Default icon for categories
+} from 'lucide-react';
+import * as LucideIcons from 'lucide-react'; // To dynamically load icons
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService } from '@/lib/appwrite';
-import { Expense, RecurringExpense } from '@/types/expense'; // Ensure RecurringExpense is defined in your types
+import { Expense, RecurringExpense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import {
   parseISO,
@@ -31,35 +46,57 @@ import {
   addYears,
   endOfDay,
 } from 'date-fns';
-import paymentAppsData from '@/data/paymentApps.json'; // Import payment apps data
-import banksData from '@/data/banks.json'; // Import bank data
+import paymentAppsData from '@/data/paymentApps.json';
+import banksData from '@/data/banks.json';
+import categoriesData from '@/data/categories.json'; // Import categories data
+import { useIsMobile } from '@/hooks/use-mobile';
+import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog'; // Import the dialog
 
 const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6b7280', '#ec4899', '#6366f1'];
 
 interface BankSuggestion {
   name: string;
   icon?: string;
-  label: string; // For display, e.g., "All Banks"
+  label: string;
 }
 
-// Ensure your Expense type can accommodate isRecurringInstance
-// Example:
-// interface Expense {
-//   // ... other fields
-//   isRecurringInstance?: boolean;
-//   paymentApp?: string; // Make sure this exists if mapping from recurring.paymentMethod
-// }
+interface ReportCategoryDetail {
+  id: string;
+  name: string; // Original name from data or the ID itself if not found
+  label: string; // Capitalized name for display
+  iconName?: string; // Icon name string from categories.json
+  IconComponent: React.ElementType; // Actual Lucide icon component
+}
+
+const reportChartConfigs = [
+  { id: 'reportCategoryPieChartWrapper', title: 'Expenses by Category Chart' },
+  { id: 'reportExpenseTrendChartWrapper', title: 'Expense Trend Chart' },
+];
+
+const reportDataSetOptions = [
+  { id: 'summaryMetrics', label: 'Summary Metrics', defaultSelected: true },
+  { id: 'monthlyTrends', label: 'Expense Trend Over Time', defaultSelected: true },
+  { id: 'categorySpending', label: 'Spending by Category', defaultSelected: true },
+  { id: 'expenseByBank', label: 'Expenses by Bank', defaultSelected: true },
+  { id: 'allExpenses', label: 'Detailed Expense List (Raw Data)', defaultSelected: true },
+  { id: 'dailySpending', label: 'Daily Spending Trend (N/A for Reports)', defaultSelected: false },
+  { id: 'allowanceByBank', label: 'Allowances by Bank (N/A for Reports)', defaultSelected: false },
+];
 
 const Reports = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [allRecurringExpenses, setAllRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [dateRange, setDateRange] = useState('thisMonth');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all'); // Stores category ID or 'all'
   const [bankFilter, setBankFilter] = useState('all');
+
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [currentReportExportData, setCurrentReportExportData] = useState<AnalyticsExportableData | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!user?.$id) {
@@ -71,7 +108,7 @@ const Reports = () => {
     setError(null);
     try {
       const [expensesResponse, recurringResponse] = await Promise.all([
-        databaseService.getExpenses(user.$id, 2000), // Fetch a good number of regular expenses
+        databaseService.getExpenses(user.$id, 2000), 
         databaseService.getRecurringExpenses(user.$id),
       ]);
       
@@ -95,33 +132,34 @@ const Reports = () => {
     const now = new Date();
     switch (dateRange) {
       case 'thisMonth':
-        return { start: startOfMonth(now), end: endOfMonth(now) };
+        return { start: startOfMonth(now), end: endOfDay(endOfMonth(now)) };
       case 'lastMonth':
         const lastMonthStart = startOfMonth(subMonths(now, 1));
-        return { start: lastMonthStart, end: endOfMonth(lastMonthStart) };
+        return { start: lastMonthStart, end: endOfDay(endOfMonth(lastMonthStart)) };
       case 'last3Months':
-        return { start: startOfMonth(subMonths(now, 2)), end: endOfMonth(now) };
+        return { start: startOfMonth(subMonths(now, 2)), end: endOfDay(endOfMonth(now)) };
       case 'thisYear':
-        return { start: startOfYear(now), end: endOfYear(now) };
-      default:
-        return { start: startOfMonth(now), end: endOfMonth(now) };
+        return { start: startOfYear(now), end: endOfDay(endOfYear(now)) };
+      default: // Should not happen with select
+        return { start: startOfMonth(now), end: endOfDay(endOfMonth(now)) };
     }
   }, [dateRange]);
 
   const processedRecurringInstances = useMemo(() => {
     const instances: Expense[] = [];
+    if (!dateInterval.start || !dateInterval.end) return instances;
+
+    const intervalStart = dateInterval.start;
+    const intervalEnd = dateInterval.end;
+
     allRecurringExpenses.forEach(re => {
-      if (!re.isActive || !re.nextDueDate) return;
+      if (!re.nextDueDate || !re.frequency || re.amount <= 0) return;
 
       let currentPaymentDate = parseISO(re.nextDueDate);
       if (!isValid(currentPaymentDate)) return;
 
-      const intervalEnd = dateInterval.end;
-      const intervalStart = dateInterval.start;
-
-      // Advance currentPaymentDate to the first occurrence within or after intervalStart
-      // This ensures we capture recurring payments whose nextDueDate might be in the past
-      // but whose cycle falls into the current interval.
+      // Advance currentPaymentDate to be within or after the interval start if it's before
+      // This ensures we don't generate past instances unnecessarily if nextDueDate is old
       while (currentPaymentDate < intervalStart) {
         let advanced = false;
         if (re.frequency === 'daily') { currentPaymentDate = addDays(currentPaymentDate, 1); advanced = true; }
@@ -129,26 +167,25 @@ const Reports = () => {
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
         
-        if (!advanced || !isValid(currentPaymentDate)) return; // Break if unknown frequency or invalid date
+        if (!advanced || !isValid(currentPaymentDate)) return; 
       }
 
       while (isValid(currentPaymentDate) && currentPaymentDate <= intervalEnd) {
-        // Only add if it's also on or after intervalStart (already handled by the loop above for the first one)
         instances.push({
           $id: `rec-${re.$id}-${format(currentPaymentDate, 'yyyyMMdd')}`,
           userId: re.userId,
-          name: re.name, // Using re.name directly, add suffix if preferred: `${re.name} (Recurring)`
+          name: re.name, 
           amount: re.amount,
           category: re.category,
           date: format(currentPaymentDate, 'yyyy-MM-dd'),
           bank: re.bank,
-          paymentApp: re.paymentMethod, // Map from RecurringExpense.paymentMethod
+          paymentMethod: re.paymentMethod,
           notes: re.notes || `Recurring schedule: ${re.frequency}`,
           isRecurringInstance: true,
-          currency: 'INR', // Assuming INR, make dynamic if needed
+          currency: 'INR', 
           $createdAt: currentPaymentDate.toISOString(),
           $updatedAt: currentPaymentDate.toISOString(),
-        } as Expense); // Cast, ensure Expense type compatibility
+        } as Expense); 
 
         let advanced = false;
         if (re.frequency === 'daily') { currentPaymentDate = addDays(currentPaymentDate, 1); advanced = true; }
@@ -156,7 +193,7 @@ const Reports = () => {
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
 
-        if (!advanced) break; // Break if unknown frequency or date becomes invalid
+        if (!advanced) break; 
       }
     });
     return instances;
@@ -168,7 +205,7 @@ const Reports = () => {
   
   const filteredExpenses = useMemo(() => {
     return combinedExpenses.filter(expense => {
-      if (!expense.date) return false;
+      if (!expense.date || !dateInterval.start || !dateInterval.end) return false;
       const expenseDate = parseISO(expense.date);
       if (!isValid(expenseDate)) return false;
 
@@ -187,7 +224,7 @@ const Reports = () => {
       categoryMap[category] = (categoryMap[category] || 0) + expense.amount;
     });
     return Object.entries(categoryMap).map(([name, amount], index) => ({
-      name,
+      name, // This should be category ID. We'll resolve to name for display later if needed or use ID.
       amount,
       color: COLORS[index % COLORS.length],
     })).sort((a,b) => b.amount - a.amount);
@@ -201,15 +238,15 @@ const Reports = () => {
     let periods: Date[];
     let dateFormat: string;
 
-    if (daysInInterval <= 0) return []; // Avoid issues with single day or invalid interval
+    if (daysInInterval <= 0) return []; 
 
-    if (daysInInterval <= 31) {
+    if (daysInInterval <= 31) { // Daily for up to 1 month
       periods = eachDayOfInterval(dateInterval);
       dateFormat = 'MMM dd';
-    } else if (daysInInterval <= 93) {
+    } else if (daysInInterval <= 93) { // Weekly for up to 3 months
       periods = eachWeekOfInterval(dateInterval, { weekStartsOn: 1 });
-      dateFormat = "MMM dd'W'";
-    } else {
+      dateFormat = "MMM dd'W'"; // e.g., "Jan 01W"
+    } else { // Monthly for longer
       periods = eachMonthOfInterval(dateInterval);
       dateFormat = 'MMM yyyy';
     }
@@ -223,29 +260,35 @@ const Reports = () => {
 
         let periodLabelToUpdate: string | null = null;
 
-        for (const pObj of periodObjects.slice().reverse()) { // Check from latest period backwards
-            let periodStartCheck = pObj.date;
-            let periodEndCheck: Date;
-
-            if (daysInInterval <= 31) periodEndCheck = endOfDay(periodStartCheck);
-            else if (daysInInterval <= 93) periodEndCheck = endOfWeek(periodStartCheck, { weekStartsOn: 1 });
-            else periodEndCheck = endOfMonth(periodStartCheck);
-            
-            if (isWithinInterval(expenseDate, { start: periodStartCheck, end: periodEndCheck })) {
-                periodLabelToUpdate = pObj.label;
-                break;
+        // Find which period this expense belongs to
+        for (const pObj of periodObjects) {
+            if (daysInInterval <= 31) { // Daily
+                if (format(expenseDate, 'MMM dd') === pObj.label) {
+                    periodLabelToUpdate = pObj.label;
+                    break;
+                }
+            } else if (daysInInterval <= 93) { // Weekly
+                const weekStart = startOfWeek(expenseDate, { weekStartsOn: 1 });
+                if (format(weekStart, "MMM dd'W'") === pObj.label) {
+                    periodLabelToUpdate = pObj.label;
+                    break;
+                }
+            } else { // Monthly
+                if (format(expenseDate, 'MMM yyyy') === pObj.label) {
+                    periodLabelToUpdate = pObj.label;
+                    break;
+                }
             }
         }
         if (periodLabelToUpdate && trendMap.hasOwnProperty(periodLabelToUpdate)) {
             trendMap[periodLabelToUpdate] += expense.amount;
         }
     });
-    
-    // Sort by actual date of the period for correct chronological order
+
     return periodObjects
-        .map(pObj => ({ period: pObj.label, amount: trendMap[pObj.label] || 0, date: pObj.date}))
-        .sort((a,b) => a.date.getTime() - b.date.getTime())
-        .map(({period, amount}) => ({period, amount})); // Return to original structure
+        .map(pObj => ({ period: pObj.label, amount: trendMap[pObj.label] || 0, date: pObj.date }))
+        .sort((a,b) => a.date.getTime() - b.date.getTime()) // Ensure chronological order
+        .map(({period, amount}) => ({period, amount})); // Remove date for final chart data
 
   }, [filteredExpenses, dateInterval]);
 
@@ -257,7 +300,7 @@ const Reports = () => {
         name: exp.name,
         amount: exp.amount,
         date: exp.date ? format(parseISO(exp.date), 'yyyy-MM-dd') : 'N/A',
-        category: exp.category,
+        category: exp.category, // This is category ID
       }));
   }, [filteredExpenses]);
 
@@ -276,18 +319,46 @@ const Reports = () => {
 
   const paymentAppUsageData = useMemo(() => {
     const appMap: { [key: string]: { app: string; amount: number; count: number } } = {};
+    const nonAppMethodKeywords = ['cash', 'credit card', 'bank transfer', 'debit card', 'other', 'card']; // Keywords for non-app methods
+
     filteredExpenses.forEach(expense => {
-      const appName = expense.paymentApp || 'Other/Cash';
-      if (!appMap[appName]) {
-        appMap[appName] = { app: appName, amount: 0, count: 0 };
+      const paymentIdentifier = expense.paymentMethod; // This is the ID or name from expense data
+      let appNameForGrouping: string;
+
+      if (paymentIdentifier) {
+        // Check if it's a known app from paymentAppsData
+        const knownApp = paymentAppsData.find(
+          app => app.id.toLowerCase() === paymentIdentifier.toLowerCase() || 
+                 app.name.toLowerCase() === paymentIdentifier.toLowerCase()
+        );
+
+        if (knownApp) {
+          appNameForGrouping = knownApp.name; // Use the display name from paymentAppsData
+        } else {
+          // If not a known app, check if it's a generic payment method
+          if (nonAppMethodKeywords.some(keyword => paymentIdentifier.toLowerCase().includes(keyword))) {
+             appNameForGrouping = 'Other/Cash';
+          } else {
+             appNameForGrouping = paymentIdentifier; // Treat as a distinct, possibly unlisted, app
+          }
+        }
+      } else {
+        appNameForGrouping = 'Other/Cash'; // Default if no payment method specified
       }
-      appMap[appName].amount += expense.amount;
-      appMap[appName].count += 1;
+
+      if (!appMap[appNameForGrouping]) {
+        appMap[appNameForGrouping] = { app: appNameForGrouping, amount: 0, count: 0 };
+      }
+      appMap[appNameForGrouping].amount += expense.amount;
+      appMap[appNameForGrouping].count += 1;
     });
     return Object.values(appMap).sort((a,b) => b.amount - a.amount);
   }, [filteredExpenses]);
   
   const summaryStats = useMemo(() => {
+    if (!dateInterval.start || !dateInterval.end) {
+        return { totalExpenses: 0, avgDailyExpense: 0, totalTransactions: 0, daysTracked: 0 };
+    }
     const total = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const numDays = differenceInDays(dateInterval.end, dateInterval.start) + 1;
     const avgDaily = numDays > 0 ? total / numDays : 0;
@@ -299,12 +370,32 @@ const Reports = () => {
     };
   }, [filteredExpenses, dateInterval]);
 
-  const uniqueCategories = useMemo(() => {
-    const categories = new Set<string>();
-    allExpenses.forEach(e => { if (e.category) categories.add(e.category); });
-    allRecurringExpenses.forEach(re => { if (re.category) categories.add(re.category); });
-    return ['all', ...Array.from(categories).sort()];
+  const uniqueCategories = useMemo((): ReportCategoryDetail[] => {
+    const categoryIds = new Set<string>();
+    allExpenses.forEach(e => { if (e.category) categoryIds.add(e.category); });
+    allRecurringExpenses.forEach(re => { if (re.category) categoryIds.add(re.category); });
+
+    const defaultIconComponent = LucideIcons.Tag;
+
+    const categoryDetailsList: ReportCategoryDetail[] = Array.from(categoryIds).sort().map(id => {
+      const categoryFromData = categoriesData.find(cat => cat.id.toLowerCase() === id.toLowerCase());
+      const name = categoryFromData?.name || id;
+      const label = name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const iconName = categoryFromData?.icon;
+      const Icon = iconName && (LucideIcons as any)[iconName] ? (LucideIcons as any)[iconName] : defaultIconComponent;
+      
+      return { id, name, label, iconName, IconComponent: Icon };
+    });
+    
+    return [
+      { id: 'all', name: 'All Categories', label: 'All Categories', IconComponent: LucideIcons.ListChecks }, 
+      ...categoryDetailsList
+    ];
   }, [allExpenses, allRecurringExpenses]);
+
+  const selectedCategoryForFilter = useMemo(() => {
+    return uniqueCategories.find(c => c.id === categoryFilter);
+  }, [uniqueCategories, categoryFilter]);
 
   const uniqueBanks = useMemo(() => {
     const bankNames = new Set<string>();
@@ -313,13 +404,74 @@ const Reports = () => {
     
     const suggestions: BankSuggestion[] = Array.from(bankNames).sort().map(name => {
       const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
-      return { name, icon: bankFromFile?.icon, label: name };
+      return { name, icon: bankFromFile?.icon, label: name }; // label is just name for banks
     });
     
     return [{ name: 'all', label: 'All Banks', icon: undefined }, ...suggestions];
   }, [allExpenses, allRecurringExpenses]);
 
   const selectedBankForFilter = uniqueBanks.find(b => b.name === bankFilter);
+
+  // Responsive Pie Chart settings
+  const pieOuterRadius = isMobile ? 70 : 120;
+  const pieInnerRadius = isMobile ? 35 : 60;
+  const pieLabelMinPercentage = isMobile ? 6 : 3; // Min percentage to show label
+  const pieLabelFontSize = isMobile ? 10 : 12;
+  const pieLabelNameMaxLength = isMobile ? 7 : 15; // Max length for category name in label
+  const legendIconSize = isMobile ? 8 : 10;
+  const legendFontSize = isMobile ? '10px' : '12px';
+
+  useEffect(() => {
+    if (loading || error || !dateInterval.start || !dateInterval.end || !summaryStats || !expenseTrendData || !expensesByCategory || !bankWiseExpensesData || !filteredExpenses) {
+      setCurrentReportExportData(null);
+      return;
+    }
+
+    const selectedCatLabel = uniqueCategories.find(c => c.id === categoryFilter)?.label || categoryFilter;
+    const selectedBankLabel = uniqueBanks.find(b => b.name === bankFilter)?.label || bankFilter;
+    const timeFilterLabel = `Report for ${dateRange} (Category: ${categoryFilter === 'all' ? 'All' : selectedCatLabel}, Bank: ${bankFilter === 'all' ? 'All' : selectedBankLabel})`;
+
+    const summaryMetricsData = [
+      { label: 'Total Expenses', value: `₹${summaryStats.totalExpenses.toLocaleString()}`, description: timeFilterLabel },
+      { label: 'Avg Daily Expense', value: `₹${summaryStats.avgDailyExpense.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, description: timeFilterLabel },
+      { label: 'Total Transactions', value: `${summaryStats.totalTransactions}`, description: timeFilterLabel },
+      { label: 'Days Tracked', value: `${summaryStats.daysTracked}`, description: timeFilterLabel },
+    ];
+
+    const trendData = expenseTrendData.map(item => ({
+      month: item.period,
+      expenses: item.amount,
+      income: 0,
+      savings: -item.amount,
+    }));
+
+    const categorySpendingData = expensesByCategory.map(cat => ({
+      category: uniqueCategories.find(c => c.id === cat.name)?.label || cat.name,
+      amount: cat.amount,
+      percentage: summaryStats.totalExpenses > 0 ? parseFloat(((cat.amount / summaryStats.totalExpenses) * 100).toFixed(1)) : 0,
+    }));
+
+    const bankExpenseData = bankWiseExpensesData.map(bank => ({
+      name: bank.bank,
+      value: bank.amount,
+    }));
+
+    setCurrentReportExportData({
+      summaryMetrics: summaryMetricsData,
+      monthlyTrends: trendData,
+      categorySpending: categorySpendingData,
+      dailySpending: [], // Not directly applicable or can be mapped from expenseTrendData if daily
+      expenseByBank: bankExpenseData,
+      allowanceByBank: [], // No allowance data in reports
+      allExpenses: filteredExpenses.map(e => ({...e, notes: e.notes || (e.isRecurringInstance ? `Recurring: ${e.name}` : '')})),
+      timeFilterLabel,
+    });
+  }, [
+    loading, error, dateInterval, dateRange, categoryFilter, bankFilter,
+    summaryStats, expenseTrendData, expensesByCategory, bankWiseExpensesData,
+    filteredExpenses, uniqueCategories, uniqueBanks // Added uniqueCategories and uniqueBanks
+  ]);
+
 
   if (loading) {
     return (
@@ -333,24 +485,45 @@ const Reports = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
         <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold text-destructive mb-2">Error Loading Reports</h2>
+        <h2 className="text-xl font-semibold text-destructive mb-2">Oops! Something went wrong.</h2>
         <p className="text-muted-foreground mb-4 text-center">{error}</p>
-        <Button onClick={fetchData}>Retry</Button>
+        <Button onClick={fetchData}>Try Again</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+    <div className="space-y-6 p-4 lg:p-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground text-sm lg:text-base">Detailed financial reports and insights</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-3">
+            <FileText className="w-8 h-8 text-primary" />
+            <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Reports</h1>
+                <p className="text-muted-foreground text-sm lg:text-base">
+                Analyze your spending patterns and financial health.
+                </p>
+            </div>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="dark:text-foreground"
+          onClick={() => {
+            if (currentReportExportData) {
+              setShowExportDialog(true);
+            } else {
+              toast({ title: "Data Not Ready", description: "Report data is still loading or not available for export.", variant: "default" });
+            }
+          }}
+          disabled={loading || !!error || !currentReportExportData}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export Report
+        </Button>
       </div>
 
-      {/* Filters */}
+      {/* Filters Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -358,110 +531,121 @@ const Reports = () => {
             Filters
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="thisMonth">This Month</SelectItem>
-                <SelectItem value="lastMonth">Last Month</SelectItem>
-                <SelectItem value="last3Months">Last 3 Months</SelectItem>
-                <SelectItem value="thisYear">This Year</SelectItem>
-                <SelectItem value="allTime">All Time</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Date Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="thisMonth">This Month</SelectItem>
+              <SelectItem value="lastMonth">Last Month</SelectItem>
+              <SelectItem value="last3Months">Last 3 Months</SelectItem>
+              <SelectItem value="thisYear">This Year</SelectItem>
+            </SelectContent>
+          </Select>
 
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueCategories.map(category => (
-                  <SelectItem key={category} value={category}>{category === 'all' ? 'All Categories' : category}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={bankFilter} onValueChange={setBankFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Bank">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Category">
+                <div className="flex items-center gap-2">
+                  {selectedCategoryForFilter?.IconComponent && (
+                    <selectedCategoryForFilter.IconComponent className="w-4 h-4" />
+                  )}
+                  {selectedCategoryForFilter?.label || "Select Category"}
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {uniqueCategories.map(category => (
+                <SelectItem key={category.id} value={category.id}>
                   <div className="flex items-center gap-2">
-                    {selectedBankForFilter?.icon && (
-                      <img src={selectedBankForFilter.icon} alt={selectedBankForFilter.label} className="w-4 h-4 object-contain" />
+                    {category.IconComponent && (
+                      <category.IconComponent className="w-4 h-4 mr-2" />
                     )}
-                    {selectedBankForFilter?.label || "Select Bank"}
+                    {category.label}
                   </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                 {uniqueBanks.map(bank => (
-                  <SelectItem key={bank.name} value={bank.name}>
-                    <div className="flex items-center gap-2">
-                      {bank.icon && (
-                        <img src={bank.icon} alt={bank.label} className="w-4 h-4 object-contain mr-2" />
-                      )}
-                      {bank.label}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={bankFilter} onValueChange={setBankFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Bank">
+                <div className="flex items-center gap-2">
+                  {selectedBankForFilter?.icon && (
+                    <img src={selectedBankForFilter.icon} alt={selectedBankForFilter.label} className="w-4 h-4 object-contain" />
+                  )}
+                  {selectedBankForFilter?.label || "Select Bank"}
+                </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+               {uniqueBanks.map(bank => (
+                <SelectItem key={bank.name} value={bank.name}>
+                  <div className="flex items-center gap-2">
+                    {bank.icon && (
+                      <img src={bank.icon} alt={bank.label} className="w-4 h-4 object-contain mr-2" />
+                    )}
+                    {bank.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                <DollarSign className="w-5 h-5" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 shrink-0">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Total Expenses</div>
-                <div className="text-xl font-bold">₹{summaryStats.totalExpenses.toLocaleString()}</div>
+              <div className="min-w-0 flex-grow">
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">Total Expenses</div>
+                <div className="text-base sm:text-lg md:text-xl font-bold truncate">₹{summaryStats.totalExpenses.toLocaleString()}</div>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                <TrendingUp className="w-5 h-5" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Avg Daily</div>
-                <div className="text-xl font-bold">₹{summaryStats.avgDailyExpense.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Transactions</div>
-                <div className="text-xl font-bold">{summaryStats.totalTransactions}</div>
+              <div className="min-w-0 flex-grow">
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">Avg Daily</div>
+                <div className="text-base sm:text-lg md:text-xl font-bold truncate">₹{summaryStats.avgDailyExpense.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400">
-                <Calendar className="w-5 h-5" />
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 shrink-0">
+                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Days Tracked</div>
-                <div className="text-xl font-bold">{summaryStats.daysTracked}</div>
+              <div className="min-w-0 flex-grow">
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">Transactions</div>
+                <div className="text-base sm:text-lg md:text-xl font-bold truncate">{summaryStats.totalTransactions}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 shrink-0">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="min-w-0 flex-grow">
+                <div className="text-xs sm:text-sm text-muted-foreground truncate">Days Tracked</div>
+                <div className="text-base sm:text-lg md:text-xl font-bold truncate">{summaryStats.daysTracked}</div>
               </div>
             </div>
           </CardContent>
@@ -476,45 +660,70 @@ const Reports = () => {
           </CardHeader>
           <CardContent>
             {expensesByCategory.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={expensesByCategory}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={120}
-                    paddingAngle={2}
-                    dataKey="amount"
-                    nameKey="name"
-                    labelLine={false}
-                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-                        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                        const x = cx + (radius + 15) * Math.cos(-midAngle * (Math.PI / 180));
-                        const y = cy + (radius + 15) * Math.sin(-midAngle * (Math.PI / 180));
-                        return (percent * 100) > 3 ? (
-                          <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="12">
-                            {`${expensesByCategory[index].name} (${(percent * 100).toFixed(0)}%)`}
+              <div id="reportCategoryPieChartWrapper"> {/* Added wrapper with ID */}
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : 300}>
+                  <PieChart>
+                    <Pie
+                      data={expensesByCategory}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={pieInnerRadius}
+                      outerRadius={pieOuterRadius}
+                      paddingAngle={2}
+                      dataKey="amount"
+                      nameKey="name" // This is category ID, tooltip/legend will need to resolve it
+                      labelLine={false}
+                      label={({ cx, cy, midAngle, outerRadius: currentOuterRadius, percent, name }) => {
+                        // name here is category ID
+                        if ((percent * 100) < pieLabelMinPercentage) return null;
+                        const categoryDetail = uniqueCategories.find(c => c.id === name);
+                        const displayName = categoryDetail ? categoryDetail.label : name;
+                        const radius = currentOuterRadius + (isMobile ? 8 : 15);
+                        const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+                        const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+                        const textAnchor = x > cx ? 'start' : 'end';
+                        const finalDisplayName = displayName.length > pieLabelNameMaxLength ? `${displayName.substring(0, pieLabelNameMaxLength)}...` : displayName;
+                        return (
+                          <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={textAnchor} dominantBaseline="central" fontSize={pieLabelFontSize}>
+                            {`${finalDisplayName} (${(percent * 100).toFixed(0)}%)`}
                           </text>
-                        ) : null;
+                        );
                       }}
-                  >
-                    {expensesByCategory.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]} 
+                    >
+                      {expensesByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number, name: string) => { // name is category ID
+                        const categoryDetail = uniqueCategories.find(c => c.id === name);
+                        const displayName = categoryDetail ? categoryDetail.label : name;
+                        return [`₹${value.toLocaleString()}`, displayName];
+                    }} 
                     contentStyle={{
                         backgroundColor: 'hsl(var(--background))', 
                         border: '1px solid hsl(var(--border))', 
                         borderRadius: 'var(--radius)',
                         color: 'hsl(var(--foreground))',
+                        fontSize: isMobile ? '10px' : '12px',
                     }}
                   />
-                  <Legend />
+                  <Legend
+                    iconSize={legendIconSize}
+                    wrapperStyle={{ fontSize: legendFontSize, paddingTop: isMobile ? '5px' : '0' }}
+                    layout={isMobile ? 'horizontal' : 'vertical'}
+                    align={isMobile ? 'center' : 'right'}
+                    verticalAlign={isMobile ? 'bottom' : 'middle'}
+                    formatter={(value) => { // value is category ID
+                      const categoryDetail = uniqueCategories.find(c => c.id === value);
+                      const displayName = categoryDetail ? categoryDetail.label : value;
+                      const nameMaxLength = isMobile ? 10 : 20;
+                      return displayName.length > nameMaxLength ? `${displayName.substring(0, nameMaxLength)}...` : displayName;
+                    }}
+                  />
                 </PieChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </div>
             ) : <p className="text-muted-foreground text-center py-10">No data for selected filters.</p>}
           </CardContent>
         </Card>
@@ -525,15 +734,16 @@ const Reports = () => {
           </CardHeader>
           <CardContent>
             {expenseTrendData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={expenseTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
-                  <XAxis dataKey="period" stroke="hsl(var(--muted-foreground))" tick={{fontSize: 12}} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${(value/1000).toFixed(0)}k`} tick={{fontSize: 12}}/>
-                  <Tooltip
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-                    labelStyle={{color: 'hsl(var(--foreground))'}}
-                    contentStyle={{
+              <div id="reportExpenseTrendChartWrapper"> {/* Added wrapper with ID */}
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={expenseTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="period" fontSize={12} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis fontSize={12} tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" tickFormatter={(value) => `₹${value/1000}k`} />
+                    <Tooltip
+                      formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
+                      labelStyle={{color: 'hsl(var(--foreground))'}}
+                      contentStyle={{
                         backgroundColor: 'hsl(var(--background))', 
                         border: '1px solid hsl(var(--border))', 
                         borderRadius: 'var(--radius)',
@@ -543,7 +753,8 @@ const Reports = () => {
                   <Legend />
                   <Line type="monotone" dataKey="amount" name="Expenses" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r:3 }} activeDot={{r:5}}/>
                 </LineChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </div>
             ) : <p className="text-muted-foreground text-center py-10">No data for selected filters.</p>}
           </CardContent>
         </Card>
@@ -558,22 +769,34 @@ const Reports = () => {
           <CardContent>
             {topExpensesList.length > 0 ? (
               <div className="space-y-3">
-                {topExpensesList.map((expense, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
-                    <div>
-                      <div className="font-medium">{expense.name}</div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <span>{expense.date}</span>
-                        <Badge variant="outline" className="text-xs capitalize">
-                          {expense.category}
-                        </Badge>
+                {topExpensesList.map((expense, index) => {
+                  const categoryDetail = uniqueCategories.find(c => c.id === expense.category);
+                  const categoryLabel = categoryDetail ? categoryDetail.label : (expense.category || 'N/A');
+                  return (
+                    <div key={index} className="p-3 rounded-lg hover:bg-muted/20 dark:hover:bg-muted/10 border border-transparent hover:border-border/30 transition-colors duration-150">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
+                        {/* Details Section */}
+                        <div className="flex-grow min-w-0"> {/* min-w-0 for better truncation */}
+                          <div className="font-semibold text-sm sm:text-base text-foreground truncate" title={expense.name}>
+                            {expense.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span>{expense.date}</span>
+                            <Badge variant="outline" className="text-xs capitalize py-0.5 px-1.5">
+                              {categoryLabel}
+                            </Badge>
+                          </div>
+                        </div>
+                        {/* Amount Section */}
+                        <div className="sm:text-right flex-shrink-0 mt-1 sm:mt-0">
+                          <div className={`font-bold text-sm sm:text-base ${expense.amount >= 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
+                            ₹{Math.abs(expense.amount).toLocaleString()}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold">₹{expense.amount.toLocaleString()}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : <p className="text-muted-foreground text-center py-10">No top expenses for selected filters.</p>}
           </CardContent>
@@ -630,7 +853,7 @@ const Reports = () => {
                       {paymentAppDetail?.icon ? (
                         <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-6 h-6 object-contain rounded" />
                       ) : (
-                        <Banknote className="w-5 h-5 text-muted-foreground" /> 
+                        <CreditCard className="w-5 h-5 text-muted-foreground" /> 
                       )}
                       <span className="font-medium">{paymentAppDetail?.name || appUsageItem.app}</span>
                     </div>
@@ -643,6 +866,17 @@ const Reports = () => {
           ) : <p className="text-muted-foreground text-center py-10">No payment app data for selected filters.</p>}
         </CardContent>
       </Card>
+
+      {/* Export Dialog */}
+      {showExportDialog && currentReportExportData && (
+        <AnalyticsExportDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          analyticsData={currentReportExportData}
+          customChartConfigs={reportChartConfigs}
+          customDataSetOptions={reportDataSetOptions}
+        />
+      )}
     </div>
   );
 };

@@ -4,21 +4,19 @@ export interface Expense {
   name: string;
   amount: number;
   category: string;
-  date: string;
-  paymentMethod: string;
+  date: string; // ISO string
+  paymentMethod?: string;
   bank?: string;
   notes?: string;
-  isRecurring?: boolean;
-  recurrenceFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  recurrenceEndDate?: string;
+  receiptUrl?: string;
   groupId?: string;
-  receiptImageUrl?: string;
-  tags?: string[];
-  location?: string;
+  splitWith?: string[]; // User IDs
+  isRecurring?: boolean; // For marking an expense as a template for recurring ones
+  isRecurringInstance?: boolean; // Add this line
   currency?: string;
-  splitWith?: Array<{ userId: string; amount: number; isSettled?: boolean }>;
-  $createdAt?: string;
-  $updatedAt?: string;
+  $createdAt?: string; // ISO string
+  $updatedAt?: string; // ISO string
+  // Add any other properties that might exist
 }
 
 export interface ExpenseCategory {

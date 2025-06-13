@@ -33,6 +33,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter, // Added
+  DialogClose, // Added
 } from '@/components/ui/dialog';
 import ExpenseForm from '@/components/ExpenseForm';
 import { Allowance } from '@/lib/allowanceService';
@@ -624,22 +626,34 @@ const Passbook = () => {
 
       {editingTransaction && (
         <Dialog open={showEditTransactionDialog} onOpenChange={(isOpen) => {
-          setShowEditTransactionDialog(isOpen);
-          if (!isOpen) setEditingTransaction(null);
-        }}>
-          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-md lg:max-w-3xl"> {/* Changed lg:max-w-2xl to lg:max-w-3xl */}
-            <DialogHeader>
-              <DialogTitle>Edit Transaction</DialogTitle>
-            </DialogHeader>
-            <ExpenseForm
-              onSubmit={handleUpdateSubmittedTransaction}
-              isLoading={isSubmittingEdit}
-              initialData={editingTransaction}
-              isEditing={true}
-              bankSuggestions={bankSuggestionsForEdit}
-            />
-          </DialogContent>
-        </Dialog>
+      setShowEditTransactionDialog(isOpen);
+      if (!isOpen) setEditingTransaction(null);
+    }}>
+      <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg">
+  <DialogHeader className="p-6 pb-4 border-b">
+    <DialogTitle>Edit Transaction</DialogTitle>
+  </DialogHeader>
+  <div className="flex-grow overflow-y-auto px-6 py-4 no-scrollbar"> {/* This makes the form itself scrollable if needed */}
+    <ExpenseForm
+            formId="edit-transaction-form"
+            onSubmit={handleUpdateSubmittedTransaction}
+            isLoading={isSubmittingEdit}
+            initialData={editingTransaction}
+            isEditing={true}
+            bankSuggestions={bankSuggestionsForEdit}
+            onDelete={handleDeleteTransaction} // Pass delete handler
+          />
+        </div>
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
+          <DialogClose asChild>
+              <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={isSubmittingEdit}>Cancel</Button>
+          </DialogClose>
+          <Button type="submit" form="edit-transaction-form" className="w-full sm:w-auto" disabled={isSubmittingEdit}>
+              {isSubmittingEdit ? "Updating..." : "Update Transaction"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
       )}
     </div>
   );
