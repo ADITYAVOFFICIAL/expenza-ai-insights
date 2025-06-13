@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -18,12 +17,12 @@ const ExpenseChart = () => {
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={dailyData}>
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-        <XAxis 
-          dataKey="day" 
+        <XAxis
+          dataKey="day"
           className="text-xs"
           tick={{ fontSize: 12 }}
         />
-        <YAxis 
+        <YAxis
           className="text-xs"
           tick={{ fontSize: 12 }}
           tickFormatter={(value) => `₹${value}`}
@@ -37,11 +36,7 @@ const ExpenseChart = () => {
             borderRadius: '8px',
           }}
         />
-        <Bar 
-          dataKey="amount" 
-          fill="#10b981" 
-          radius={[4, 4, 0, 0]}
-        />
+        <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

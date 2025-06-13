@@ -1,305 +1,444 @@
-
-import React, { useState } from 'react';
-import { Users, Plus, Settings, Crown, DollarSign, Check, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Users, Plus, Settings, Crown, DollarSign, AlertTriangle, Edit, Trash2, Image as ImageIcon, Globe , Badge} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { databaseService, COLLECTIONS, storageService } from '@/lib/appwrite';
+import { toast } from '@/hooks/use-toast';
+import { Models, ID } from 'appwrite';
+import { Expense } from '@/types/expense';
+import { useNavigate } from 'react-router-dom';
+import { format, parseISO } from 'date-fns';
+
+interface GroupExpense extends Expense {
+  // Inherits from Expense
+}
+
+// Updated Group interface based on new Appwrite attributes
+interface Group extends Models.Document {
+  name: string;
+  description?: string;
+  members: string[]; // Array of user IDs
+  adminUserIds: string[]; // Array of admin user IDs
+  createdBy: string; // User ID of the creator
+  currency: string; // Default 'INR'
+  avatarUrl?: string; // URL string for group avatar
+  // UI-derived or fetched separately
+  membersToDisplay?: string[];
+  isAdmin?: boolean;
+  totalExpenses?: number;
+  recentExpenses?: GroupExpense[];
+  displayAvatarUrl?: string; // Processed avatar URL for display
+}
+
+const initialGroupFormState = {
+  name: '',
+  description: '',
+  membersString: '',
+  currency: 'INR',
+  avatarFile: null as File | null,
+  existingAvatarUrl: '' as string | undefined,
+};
 
 const Groups = () => {
-  const [groups, setGroups] = useState([
-    {
-      id: '1',
-      name: 'Roommates',
-      description: 'Shared expenses for apartment',
-      members: ['You', 'John', 'Sarah', 'Mike'],
-      totalExpenses: 15400,
-      yourShare: 3850,
-      isAdmin: true,
-      recentExpenses: [
-        { id: '1', name: 'Electricity Bill', amount: 2400, paidBy: 'You', date: '2024-01-15' },
-        { id: '2', name: 'Groceries', amount: 1800, paidBy: 'John', date: '2024-01-14' },
-        { id: '3', name: 'Internet Bill', amount: 1200, paidBy: 'Sarah', date: '2024-01-13' },
-      ]
-    },
-    {
-      id: '2',
-      name: 'Trip to Goa',
-      description: 'Weekend trip expenses',
-      members: ['You', 'Alex', 'Priya'],
-      totalExpenses: 8900,
-      yourShare: 2966,
-      isAdmin: false,
-      recentExpenses: [
-        { id: '4', name: 'Hotel Booking', amount: 4500, paidBy: 'Alex', date: '2024-01-12' },
-        { id: '5', name: 'Food & Drinks', amount: 2800, paidBy: 'You', date: '2024-01-11' },
-        { id: '6', name: 'Transportation', amount: 1600, paidBy: 'Priya', date: '2024-01-10' },
-      ]
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
+  const [currentEditingGroupId, setCurrentEditingGroupId] = useState<string | null>(null);
+  const [groupFormData, setGroupFormData] = useState(initialGroupFormState);
+
+  const fetchGroupsAndExpenses = useCallback(async () => {
+    if (!user?.$id) {
+      setIsLoading(false);
+      return;
     }
-  ]);
+    setIsLoading(true);
+    try {
+      const groupResponse = await databaseService.getGroups(user.$id);
+      const fetchedGroupsPromises = groupResponse.documents.map(async (doc) => {
+        const groupDoc = doc as Group;
+        let totalExpenses = 0;
+        let recentExpenses: GroupExpense[] = [];
+        let displayAvatarUrl: string | undefined = undefined;
 
-  const [settlements, setSettlements] = useState([
-    { id: '1', from: 'You', to: 'John', amount: 450, groupName: 'Roommates', status: 'pending' },
-    { id: '2', from: 'Sarah', to: 'You', amount: 300, groupName: 'Roommates', status: 'pending' },
-    { id: '3', from: 'Alex', to: 'You', amount: 200, groupName: 'Trip to Goa', status: 'completed' },
-  ]);
+        if (groupDoc.avatarUrl) {
+          try {
+            displayAvatarUrl = storageService.getFilePreview(groupDoc.avatarUrl, 100, 100).toString();
+          } catch (e) {
+            console.warn("Failed to get avatar preview for group:", groupDoc.name, e)
+          }
+        }
 
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [newGroup, setNewGroup] = useState({ name: '', description: '', members: '' });
+        try {
+          const expenseResponse = await databaseService.getGroupExpenses(groupDoc.$id, 50);
+          recentExpenses = expenseResponse.documents.slice(0, 3).map(exDoc => ({
+            ...exDoc,
+            amount: Number(exDoc.amount),
+            date: exDoc.date || exDoc.$createdAt,
+          })) as GroupExpense[];
+          totalExpenses = expenseResponse.documents.reduce((sum, ex) => sum + Number(ex.amount), 0);
+        } catch (expenseError) {
+          console.error(`Failed to fetch expenses for group ${groupDoc.$id}:`, expenseError);
+        }
 
-  const handleCreateGroup = () => {
-    const members = newGroup.members.split(',').map(m => m.trim()).filter(m => m);
-    const group = {
-      id: Date.now().toString(),
-      name: newGroup.name,
-      description: newGroup.description,
-      members: ['You', ...members],
-      totalExpenses: 0,
-      yourShare: 0,
-      isAdmin: true,
-      recentExpenses: []
+        return {
+          ...groupDoc,
+          isAdmin: groupDoc.adminUserIds.includes(user.$id),
+          membersToDisplay: groupDoc.members.map(id => id === user.$id ? 'You' : id),
+          totalExpenses,
+          recentExpenses,
+          displayAvatarUrl,
+        };
+      });
+
+      const resolvedGroups = await Promise.all(fetchedGroupsPromises);
+      setGroups(resolvedGroups as Group[]);
+    } catch (error) {
+      console.error('Failed to fetch groups:', error);
+      toast({ title: 'Error', description: 'Could not fetch groups.', variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchGroupsAndExpenses();
+  }, [fetchGroupsAndExpenses]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setGroupFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setGroupFormData(prev => ({ ...prev, avatarFile: e.target.files![0] }));
+    }
+  };
+
+  const handleSubmitGroup = async () => {
+    if (!user?.$id) return;
+
+    if (!groupFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Group name is required.', variant: 'destructive' });
+      return;
+    }
+    setProcessing(true);
+
+    let uploadedAvatarFileId: string | undefined = groupFormData.existingAvatarUrl;
+
+    if (groupFormData.avatarFile) {
+      try {
+        // If there was an old avatar and we're uploading a new one, delete the old one first
+        if (isEditingGroup && currentEditingGroupId && groupFormData.existingAvatarUrl) {
+            const oldGroup = groups.find(g => g.$id === currentEditingGroupId);
+            if (oldGroup?.avatarUrl) {
+                 try { await storageService.deleteFile(oldGroup.avatarUrl); }
+                 catch (e) { console.warn("Could not delete old avatar", e); }
+            }
+        }
+        const uploadedFile = await storageService.uploadFile(groupFormData.avatarFile);
+        uploadedAvatarFileId = uploadedFile.$id;
+      } catch (error) {
+        console.error('Failed to upload group avatar:', error);
+        toast({ title: 'Avatar Upload Error', description: 'Could not upload group avatar.', variant: 'destructive' });
+        setProcessing(false);
+        return;
+      }
+    }
+
+
+    const memberInputs = groupFormData.membersString.split(',')
+      .map(m => m.trim())
+      .filter(m => m.length > 0);
+    const finalMembers = Array.from(new Set([user.$id, ...memberInputs]));
+
+    const groupPayload: any = {
+      name: groupFormData.name.trim(),
+      description: groupFormData.description.trim() || undefined,
+      members: finalMembers,
+      currency: groupFormData.currency || 'INR',
+      avatarUrl: uploadedAvatarFileId,
     };
-    setGroups([...groups, group]);
-    setNewGroup({ name: '', description: '', members: '' });
-    setShowCreateGroup(false);
+
+    try {
+      if (isEditingGroup && currentEditingGroupId) {
+        // For update, adminUserIds and createdBy are generally not changed by this form
+        // Only update fields that are part of the form
+        const updatePayload = {
+            name: groupPayload.name,
+            description: groupPayload.description,
+            members: groupPayload.members, // Allow members update
+            currency: groupPayload.currency,
+            avatarUrl: groupPayload.avatarUrl,
+        };
+        await databaseService.updateDocument(COLLECTIONS.GROUPS, currentEditingGroupId, updatePayload);
+        toast({ title: 'Success', description: 'Group updated successfully.' });
+      } else {
+        // For new group
+        groupPayload.adminUserIds = [user.$id]; // Creator is the first admin
+        groupPayload.createdBy = user.$id;
+        await databaseService.createGroup(groupPayload);
+        toast({ title: 'Success', description: 'Group created successfully.' });
+      }
+      setShowGroupDialog(false);
+      fetchGroupsAndExpenses();
+    } catch (error) {
+      console.error(`Failed to ${isEditingGroup ? 'update' : 'create'} group:`, error);
+      toast({ title: 'Error', description: `Could not ${isEditingGroup ? 'update' : 'create'} group.`, variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+      setGroupFormData(initialGroupFormState); // Reset form
+      setCurrentEditingGroupId(null);
+      setIsEditingGroup(false);
+    }
+  };
+  
+  const handleOpenCreateDialog = () => {
+    setIsEditingGroup(false);
+    setCurrentEditingGroupId(null);
+    setGroupFormData(initialGroupFormState);
+    setShowGroupDialog(true);
   };
 
-  const handleSettlement = (settlementId: string, action: 'accept' | 'reject') => {
-    setSettlements(settlements.map(s => 
-      s.id === settlementId 
-        ? { ...s, status: action === 'accept' ? 'completed' : 'rejected' }
-        : s
-    ));
+  const handleOpenEditDialog = (group: Group) => {
+    setIsEditingGroup(true);
+    setCurrentEditingGroupId(group.$id);
+    setGroupFormData({
+      name: group.name,
+      description: group.description || '',
+      membersString: group.members.filter(id => id !== user?.$id).join(', '),
+      currency: group.currency || 'INR',
+      avatarFile: null,
+      existingAvatarUrl: group.avatarUrl, // Store existing avatar ID to avoid re-upload if not changed
+    });
+    setShowGroupDialog(true);
   };
 
-  const pendingSettlements = settlements.filter(s => s.status === 'pending');
-  const totalOwed = pendingSettlements.filter(s => s.from === 'You').reduce((acc, s) => acc + s.amount, 0);
-  const totalOwedToYou = pendingSettlements.filter(s => s.to === 'You').reduce((acc, s) => acc + s.amount, 0);
+  const handleDeleteGroup = async (groupId: string, avatarUrl?: string) => {
+    const group = groups.find(g => g.$id === groupId);
+    if (!group || !group.adminUserIds.includes(user?.$id || '')) {
+        toast({ title: "Unauthorized", description: "Only an admin can delete this group.", variant: "destructive" });
+        return;
+    }
+    if (!window.confirm('Are you sure you want to delete this group? This action cannot be undone.')) return;
+    
+    setProcessing(true);
+    try {
+      if (avatarUrl) {
+        try { await storageService.deleteFile(avatarUrl); }
+        catch (e) { console.warn("Could not delete group avatar during group deletion:", e); }
+      }
+      await databaseService.deleteDocument(COLLECTIONS.GROUPS, groupId);
+      // Note: Expenses associated with this groupId are not automatically deleted.
+      // This would require additional logic if desired.
+      toast({ title: 'Success', description: 'Group deleted successfully.' });
+      fetchGroupsAndExpenses();
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      toast({ title: 'Error', description: 'Could not delete group.', variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleAddExpenseToGroup = (groupId: string) => {
+    navigate(`/add-expense?groupId=${groupId}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Groups</h1>
           <p className="text-muted-foreground text-sm lg:text-base">Manage shared expenses with friends</p>
         </div>
-        <Dialog open={showCreateGroup} onOpenChange={setShowCreateGroup}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Group
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Group</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="groupName">Group Name</Label>
-                <Input
-                  id="groupName"
-                  value={newGroup.name}
-                  onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
-                  placeholder="e.g., Trip to Goa"
-                />
-              </div>
-              <div>
-                <Label htmlFor="groupDescription">Description</Label>
-                <Textarea
-                  id="groupDescription"
-                  value={newGroup.description}
-                  onChange={(e) => setNewGroup({ ...newGroup, description: e.target.value })}
-                  placeholder="Brief description of the group"
-                />
-              </div>
-              <div>
-                <Label htmlFor="groupMembers">Members (comma separated)</Label>
-                <Input
-                  id="groupMembers"
-                  value={newGroup.members}
-                  onChange={(e) => setNewGroup({ ...newGroup, members: e.target.value })}
-                  placeholder="John, Sarah, Mike"
-                />
-              </div>
-              <Button onClick={handleCreateGroup} className="w-full">
-                Create Group
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={handleOpenCreateDialog} className="w-full sm:w-auto" disabled={processing}>
+          <Plus className="w-4 h-4 mr-2" /> Create Group
+        </Button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 lg:p-6">
+      <Card>
+        <CardContent className="p-4 lg:p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-red-100 text-red-600">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">You Owe</div>
-                <div className="text-xl font-bold text-red-600">₹{totalOwed.toLocaleString()}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Owed to You</div>
-                <div className="text-xl font-bold text-green-600">₹{totalOwedToYou.toLocaleString()}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Active Groups</div>
-                <div className="text-xl font-bold">{groups.length}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Pending Settlements */}
-      {pendingSettlements.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Pending Settlements</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pendingSettlements.map((settlement) => (
-                <div key={settlement.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                  <div>
-                    <div className="font-medium">
-                      {settlement.from === 'You' ? 'You owe' : `${settlement.from} owes you`} ₹{settlement.amount}
-                    </div>
-                    <div className="text-sm text-muted-foreground">{settlement.groupName}</div>
-                  </div>
-                  {settlement.to === 'You' && (
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="text-green-600"
-                        onClick={() => handleSettlement(settlement.id, 'accept')}
-                      >
-                        <Check className="w-4 h-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="text-red-600"
-                        onClick={() => handleSettlement(settlement.id, 'reject')}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                    <Users className="w-5 h-5" />
                 </div>
-              ))}
+                <div>
+                    <div className="text-sm text-muted-foreground">Active Groups</div>
+                    <div className="text-xl font-bold">{groups.length}</div>
+                </div>
             </div>
+        </CardContent>
+      </Card>
+
+      {groups.length === 0 && !isLoading && (
+         <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-lg font-semibold mb-1">No Groups Yet</h3>
+            <p className="text-sm">Create a group to start sharing expenses with others.</p>
           </CardContent>
         </Card>
       )}
 
-      {/* Groups List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {groups.map((group) => (
-          <Card key={group.id}>
+          <Card key={group.$id}>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
-                  <CardTitle className="text-lg">{group.name}</CardTitle>
-                  {group.isAdmin && <Crown className="w-4 h-4 text-yellow-500" />}
+                    <Avatar className="w-10 h-10">
+                        {group.displayAvatarUrl ? <AvatarImage src={group.displayAvatarUrl} alt={group.name} /> : null}
+                        <AvatarFallback><Users className="w-5 h-5"/></AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <CardTitle className="text-lg">{group.name}</CardTitle>
+                        {group.isAdmin && <Badge variant="outline" className="mt-1 text-xs border-yellow-500 text-yellow-600"><Crown className="w-3 h-3 mr-1 text-yellow-500" />Admin</Badge>}
+                    </div>
                 </div>
-                <Button variant="ghost" size="icon">
-                  <Settings className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                    {group.isAdmin && (
+                        <>
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenEditDialog(group)} disabled={processing} title="Edit Group">
+                            <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteGroup(group.$id, group.avatarUrl)} disabled={processing} className="text-destructive hover:text-destructive/90" title="Delete Group">
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
+                        </>
+                    )}
+                     <Button variant="ghost" size="icon" onClick={() => toast({title: "Info", description: "Detailed group settings not implemented yet."})} title="Group Settings">
+                        <Settings className="w-4 h-4" />
+                    </Button>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">{group.description}</p>
+              {group.description && <p className="text-sm text-muted-foreground pt-2">{group.description}</p>}
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Members */}
-                <div>
-                  <div className="text-sm font-medium mb-2">Members ({group.members.length})</div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.members.map((member, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <Avatar className="w-6 h-6">
-                          <AvatarFallback className="text-xs">{member[0]}</AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{member}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Expense Summary */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Total Expenses</div>
-                    <div className="font-semibold">₹{group.totalExpenses.toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Your Share</div>
-                    <div className="font-semibold">₹{group.yourShare.toLocaleString()}</div>
-                  </div>
-                </div>
-
-                {/* Recent Expenses */}
-                <div>
-                  <div className="text-sm font-medium mb-2">Recent Expenses</div>
-                  <div className="space-y-2">
-                    {group.recentExpenses.slice(0, 3).map((expense) => (
-                      <div key={expense.id} className="flex justify-between items-center text-sm">
-                        <div>
-                          <div className="font-medium">{expense.name}</div>
-                          <div className="text-muted-foreground">Paid by {expense.paidBy}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium">₹{expense.amount.toLocaleString()}</div>
-                          <div className="text-xs text-muted-foreground">{expense.date}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Add Expense
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
-                    Settle Up
-                  </Button>
+            <CardContent><div className="space-y-4">
+              <div>
+                <div className="text-sm font-medium mb-2">Members ({group.members.length})</div>
+                <div className="flex flex-wrap gap-2">
+                  {(group.membersToDisplay || group.members).map((memberIdOrName, index) => (
+                    <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded-md">
+                      <Avatar className="w-5 h-5"><AvatarFallback className="text-xs">{typeof memberIdOrName === 'string' ? memberIdOrName.charAt(0).toUpperCase() : '?'}</AvatarFallback></Avatar>
+                      <span className="text-sm">{memberIdOrName}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            </CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <div className="text-sm text-muted-foreground">Total Expenses</div>
+                    <div className="font-semibold">{group.currency} {(group.totalExpenses || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                    <div className="text-sm text-muted-foreground">Currency</div>
+                    <div className="font-semibold">{group.currency}</div>
+                </div>
+              </div>
+              <div>
+                <div className="text-sm font-medium mb-2">Recent Expenses</div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {(group.recentExpenses && group.recentExpenses.length > 0) ? group.recentExpenses.map((expense) => (
+                    <div key={expense.$id} className="flex justify-between items-center text-sm p-2 bg-muted/30 rounded-md">
+                      <div>
+                        <div className="font-medium">{expense.name || 'Expense'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Paid by {expense.userId === user?.$id ? 'You' : (expense.userId || 'Unknown')} on {format(parseISO(expense.date), 'MMM dd')}
+                        </div>
+                      </div>
+                      <div className="font-medium">{group.currency} {expense.amount.toLocaleString()}</div>
+                    </div>
+                  )) : <p className="text-xs text-muted-foreground">No recent expenses in this group.</p>}
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2 border-t">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddExpenseToGroup(group.$id)}>Add Expense</Button>
+              </div>
+            </div></CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Create/Edit Group Dialog */}
+      <Dialog open={showGroupDialog} onOpenChange={(isOpen) => {
+          if (processing && !isOpen) return;
+          setShowGroupDialog(isOpen);
+          if (!isOpen) {
+            setIsEditingGroup(false);
+            setGroupFormData(initialGroupFormState);
+            setCurrentEditingGroupId(null);
+          }
+      }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{isEditingGroup ? 'Edit' : 'Create New'} Group</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+                <Label htmlFor="groupName">Group Name *</Label>
+                <Input id="groupName" name="name" value={groupFormData.name} onChange={handleInputChange} placeholder="e.g., Weekend Trip" />
+            </div>
+            <div>
+                <Label htmlFor="groupDescription">Description</Label>
+                <Textarea id="groupDescription" name="description" value={groupFormData.description} onChange={handleInputChange} placeholder="Brief description of the group" />
+            </div>
+            <div>
+                <Label htmlFor="groupMembers">Add Members (comma separated user IDs/emails)</Label>
+                <Input id="groupMembers" name="membersString" value={groupFormData.membersString} onChange={handleInputChange} placeholder="e.g., user_id_1, friend@example.com" />
+                <p className="text-xs text-muted-foreground mt-1">You will be automatically added.</p>
+            </div>
+            <div>
+                <Label htmlFor="groupCurrency">Currency</Label>
+                <select id="groupCurrency" name="currency" value={groupFormData.currency} onChange={handleInputChange} className="w-full mt-1 p-2 border rounded-md bg-background">
+                    <option value="INR">INR (₹)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    {/* Add more currencies as needed */}
+                </select>
+            </div>
+            <div>
+                <Label htmlFor="groupAvatar">Group Avatar (Optional)</Label>
+                <Input id="groupAvatar" name="avatarFile" type="file" accept="image/*" onChange={handleAvatarFileChange} className="mt-1" />
+                {isEditingGroup && groupFormData.existingAvatarUrl && !groupFormData.avatarFile && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                        Current avatar: <ImageIcon className="inline w-4 h-4 mr-1" /> 
+                        {groupFormData.existingAvatarUrl.substring(0,20)}... 
+                        (upload new to replace)
+                    </div>
+                )}
+                 {groupFormData.avatarFile && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                        New avatar selected: {groupFormData.avatarFile.name}
+                    </div>
+                )}
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline" disabled={processing}>Cancel</Button></DialogClose>
+            <Button type="submit" onClick={handleSubmitGroup} disabled={processing}>
+                {processing ? (isEditingGroup ? 'Saving...' : 'Creating...') : (isEditingGroup ? 'Save Changes' : 'Create Group')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

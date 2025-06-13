@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react"
 
 type Theme = "dark" | "light" | "system"
@@ -24,7 +23,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 export function ThemeProvider({
   children,
   defaultTheme = "system",
-  storageKey = "vite-ui-theme",
+  storageKey = "vite-ui-theme", // Ensure this matches your storage key in App.tsx
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
@@ -43,6 +42,9 @@ export function ThemeProvider({
         : "light"
 
       root.classList.add(systemTheme)
+      // If you want to reflect the actual system theme back to the state
+      // and localStorage, you could call setTheme(systemTheme) here,
+      // but be mindful of potential loops if not handled carefully.
       return
     }
 

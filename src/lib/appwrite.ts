@@ -1,108 +1,114 @@
-
-import { Client, Account, Databases, Storage, Functions, ID, Query } from 'appwrite';
+import { Client, Account, Databases, Storage, Functions, ID, Query, Models } from 'appwrite';
 
 const client = new Client();
 
 client
-  .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1')
-  .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID || '684b3fe10028096d94d1');
+  .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT)
+  .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
 
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
 export const functions = new Functions(client);
 
-// Database and Collection IDs
-export const DATABASE_ID = 'expenza-db';
+export const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 export const COLLECTIONS = {
-  EXPENSES: 'expenses',
-  GROUPS: 'groups',
-  GOALS: 'goals',
-  CATEGORIES: 'categories',
-  USERS: 'users',
-  GROUP_MEMBERS: 'group-members',
-  SPLITS: 'splits',
-  ALLOWANCES: 'allowances',
-  RECURRING_EXPENSES: 'recurring-expenses'
+  USERS: import.meta.env.VITE_APPWRITE_USERS_COLLECTION_ID,
+  EXPENSES: import.meta.env.VITE_APPWRITE_EXPENSES_COLLECTION_ID,
+  ALLOWANCES: import.meta.env.VITE_APPWRITE_ALLOWANCES_COLLECTION_ID,
+  CATEGORIES: import.meta.env.VITE_APPWRITE_CATEGORIES_COLLECTION_ID,
+  RECURRING_EXPENSES: import.meta.env.VITE_APPWRITE_RECURRING_EXPENSES_COLLECTION_ID,
+  GROUPS: import.meta.env.VITE_APPWRITE_GROUPS_COLLECTION_ID,
+  GOALS: import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID,
+  GROUP_MEMBERS: import.meta.env.VITE_APPWRITE_GROUP_MEMBERS_COLLECTION_ID, // Assuming this exists if used
+  SPLITS: import.meta.env.VITE_APPWRITE_SPLITS_COLLECTION_ID, // Assuming this exists if used
 };
+export const STORAGE_BUCKET_ID = import.meta.env.VITE_APPWRITE_STORAGE_BUCKET_ID;
 
-// Storage
-export const STORAGE_BUCKET_ID = import.meta.env.VITE_APPWRITE_STORAGE_BUCKET_ID || '684b4546002529c93d14';
+interface UserProfileCreationData {
+  name: string;
+  email: string;
+}
 
-// Authentication functions
+interface UserProfileUpdateData {
+  name?: string;
+  phoneNumber?: string;
+  currency?: string;
+  avatarUrl?: string;
+}
+
+export interface GenericDocData { // Made exportable for use in other files if needed
+  [key: string]: unknown;
+}
+
+export interface PartialGenericDocData { // Made exportable
+  [key: string]: unknown | undefined;
+}
+
+interface GroupCreationData {
+  name: string;
+  description?: string;
+  adminUserIds: string[]; // Changed from adminId to adminUserIds (array)
+  members: string[];      // Changed from memberIds to members (array)
+  createdBy: string;      // Changed from createdByUserId to createdBy
+  currency?: string;      // Added currency
+  avatarUrl?: string;     // Added avatarUrl
+}
+
 export const authService = {
   async createAccount(email: string, password: string, name: string) {
-    try {
-      const userAccount = await account.create(ID.unique(), email, password, name);
-      if (userAccount) {
-        // Create user profile document
-        await this.createUserProfile(userAccount.$id, {
-          name,
-          email,
-          currency: 'INR',
-          parentAccess: false
-        });
-        return this.login(email, password);
-      }
-      return userAccount;
-    } catch (error) {
-      throw error;
-    }
+    return account.create(ID.unique(), email, password, name);
   },
 
   async login(email: string, password: string) {
-    try {
-      return await account.createEmailPasswordSession(email, password);
-    } catch (error) {
-      throw error;
-    }
+    return account.createEmailPasswordSession(email, password);
   },
 
-  async getCurrentUser() {
+  async getCurrentUser(): Promise<Models.User<Models.Preferences> | null> {
     try {
-      const user = await account.get();
-      // Get user profile
-      const profile = await this.getUserProfile(user.$id);
-      return { ...user, profile };
+      return await account.get();
     } catch (error) {
+      // console.error("Failed to get current user:", error);
       return null;
     }
   },
 
   async logout() {
-    try {
-      return await account.deleteSessions();
-    } catch (error) {
-      throw error;
-    }
+    return account.deleteSessions();
   },
 
   async logoutCurrent() {
-    try {
-      return await account.deleteSession('current');
-    } catch (error) {
-      throw error;
-    }
+    return account.deleteSession('current');
   },
 
-  async createUserProfile(userId: string, data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.USERS,
-        userId,
-        {
-          ...data,
-          userId,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createUserProfile(userId: string, data: UserProfileCreationData) {
+    const now = new Date().toISOString();
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.USERS,
+      userId, // Using userId as documentId for user profiles
+      {
+        name: data.name,
+        email: data.email,
+        userId: userId, // Storing userId also as a field for easier querying if needed
+        createdAt: now,
+        updatedAt: now,
+        // Initialize other fields as per your UserProfile type in expense.ts
+        phoneNumber: undefined,
+        currency: "INR", // Default currency
+        avatarUrl: undefined,
+        profilePictureUrl: undefined,
+        age: undefined,
+        occupation: undefined,
+        incomeLevel: undefined,
+        financialKnowledge: undefined,
+        riskTolerance: undefined,
+        primaryBank: undefined,
+      }
+    );
   },
 
-  async getUserProfile(userId: string) {
+  async getUserProfile(userId: string): Promise<Models.Document | null> {
     try {
       return await databases.getDocument(
         DATABASE_ID,
@@ -110,347 +116,268 @@ export const authService = {
         userId
       );
     } catch (error) {
-      return null;
+      // console.error(`Failed to get user profile for ${userId}:`, error);
+      return null; // Return null if profile doesn't exist or other error
     }
   },
 
-  async updateUserProfile(userId: string, data: any) {
-    try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.USERS,
-        userId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async updateUserProfile(userId: string, data: UserProfileUpdateData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.USERS,
+      userId,
+      {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      }
+    );
   }
 };
 
-// Database functions
 export const databaseService = {
   // Expenses
-  async createExpense(data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.EXPENSES,
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createExpense(data: GenericDocData) {
+    const now = new Date().toISOString();
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.EXPENSES,
+      ID.unique(),
+      { ...data, createdAt: now, updatedAt: now }
+    );
   },
-
   async getExpenses(userId: string, limit = 50) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTIONS.EXPENSES,
-        [
-          Query.equal('userId', userId),
-          Query.orderDesc('createdAt'),
-          Query.limit(limit)
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.EXPENSES,
+      [
+        Query.equal('userId', userId), // Assuming expenses are primarily tied to a user
+        Query.limit(limit),
+        Query.orderDesc('$createdAt')
+      ]
+    );
   },
-
-  async updateExpense(documentId: string, data: any) {
-    try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.EXPENSES,
-        documentId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async getGroupExpenses(groupId: string, limit = 5) { // New function
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.EXPENSES,
+      [
+        Query.equal('groupId', groupId),
+        Query.limit(limit),
+        Query.orderDesc('$createdAt')
+      ]
+    );
   },
-
+  async updateExpense(documentId: string, data: PartialGenericDocData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.EXPENSES,
+      documentId,
+      { ...data, updatedAt: new Date().toISOString() }
+    );
+  },
   async deleteExpense(documentId: string) {
-    try {
-      return await databases.deleteDocument(
-        DATABASE_ID,
-        COLLECTIONS.EXPENSES,
-        documentId
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.deleteDocument(
+      DATABASE_ID,
+      COLLECTIONS.EXPENSES,
+      documentId
+    );
   },
 
   // Groups
-  async createGroup(data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.GROUPS,
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createGroup(data: GroupCreationData) {
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.GROUPS,
+      ID.unique(),
+      {
+        ...data,
+        currency: data.currency || 'INR', // Default currency if not provided
+      }
+    );
   },
-
   async getGroups(userId: string) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTIONS.GROUPS,
-        [
-          Query.search('members', userId),
-          Query.orderDesc('createdAt')
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.GROUPS,
+      [
+        Query.contains('members', userId), // Changed from 'memberIds' to 'members'
+        Query.orderDesc('$createdAt')
+      ]
+    );
   },
+  // updateGroup and deleteGroup are handled by generic updateDocument/deleteDocument
+  // but you might want specific functions if complex logic is needed before/after.
 
   // Goals
-  async createGoal(data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.GOALS,
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createGoal(data: GenericDocData) {
+    const now = new Date().toISOString();
+    // Ensure userId is included in the data payload passed to this function
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.GOALS,
+      ID.unique(),
+      { ...data, createdAt: now, updatedAt: now }
+    );
   },
-
   async getGoals(userId: string) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTIONS.GOALS,
-        [
-          Query.equal('userId', userId),
-          Query.orderDesc('createdAt')
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.GOALS,
+      [
+        Query.equal('userId', userId),
+        Query.orderDesc('$createdAt')
+      ]
+    );
   },
-
-  async updateGoal(documentId: string, data: any) {
-    try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.GOALS,
-        documentId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async updateGoal(documentId: string, data: PartialGenericDocData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.GOALS,
+      documentId,
+      { ...data, updatedAt: new Date().toISOString() }
+    );
+  },
+  async deleteGoal(documentId: string) {
+    return databases.deleteDocument(
+      DATABASE_ID,
+      COLLECTIONS.GOALS,
+      documentId
+    );
   },
 
   // Allowances
-  async createAllowance(data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.ALLOWANCES,
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createAllowance(data: GenericDocData) {
+    const now = new Date().toISOString();
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.ALLOWANCES,
+      ID.unique(),
+      { ...data, createdAt: now, updatedAt: now }
+    );
   },
-
   async getAllowances(userId: string) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTIONS.ALLOWANCES,
-        [
-          Query.equal('userId', userId),
-          Query.orderDesc('createdAt')
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.ALLOWANCES,
+      [
+        Query.equal('userId', userId),
+        Query.orderDesc('$createdAt')
+      ]
+    );
   },
-
-  async updateAllowance(documentId: string, data: any) {
-    try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        COLLECTIONS.ALLOWANCES,
-        documentId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async updateAllowance(documentId: string, data: PartialGenericDocData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.ALLOWANCES,
+      documentId,
+      { ...data, updatedAt: new Date().toISOString() }
+    );
   },
-
   async deleteAllowance(documentId: string) {
-    try {
-      return await databases.deleteDocument(
-        DATABASE_ID,
-        COLLECTIONS.ALLOWANCES,
-        documentId
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.deleteDocument(
+      DATABASE_ID,
+      COLLECTIONS.ALLOWANCES,
+      documentId
+    );
   },
 
   // Recurring Expenses
-  async createRecurringExpense(data: any) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        COLLECTIONS.RECURRING_EXPENSES,
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createRecurringExpense(data: GenericDocData) {
+    const now = new Date().toISOString();
+    return databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.RECURRING_EXPENSES,
+      ID.unique(),
+      { ...data, createdAt: now, updatedAt: now }
+    );
   },
-
   async getRecurringExpenses(userId: string) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        COLLECTIONS.RECURRING_EXPENSES,
-        [
-          Query.equal('userId', userId),
-          Query.orderDesc('createdAt')
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.RECURRING_EXPENSES,
+      [
+        Query.equal('userId', userId),
+        Query.orderDesc('nextDueDate') // Or $createdAt, depending on desired sort
+      ]
+    );
+  },
+  async updateRecurringExpense(documentId: string, data: PartialGenericDocData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      COLLECTIONS.RECURRING_EXPENSES,
+      documentId,
+      { ...data, updatedAt: new Date().toISOString() }
+    );
+  },
+  async deleteRecurringExpense(documentId: string) {
+    return databases.deleteDocument(
+      DATABASE_ID,
+      COLLECTIONS.RECURRING_EXPENSES,
+      documentId
+    );
   },
 
-  // Generic CRUD operations
-  async createDocument(collectionId: string, data: any, documentId?: string) {
-    try {
-      return await databases.createDocument(
-        DATABASE_ID,
-        collectionId,
-        documentId || ID.unique(),
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  // Generic CRUD
+  async createDocument(collectionId: string, data: GenericDocData, documentId?: string) {
+    const now = new Date().toISOString();
+    return databases.createDocument(
+      DATABASE_ID,
+      collectionId,
+      documentId || ID.unique(),
+      { ...data, createdAt: now, updatedAt: now }
+    );
   },
-
   async getDocument(collectionId: string, documentId: string) {
-    try {
-      return await databases.getDocument(
-        DATABASE_ID,
-        collectionId,
-        documentId
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.getDocument(
+      DATABASE_ID,
+      collectionId,
+      documentId
+    );
   },
-
   async listDocuments(collectionId: string, queries: string[] = []) {
-    try {
-      return await databases.listDocuments(
-        DATABASE_ID,
-        collectionId,
-        queries
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.listDocuments(
+      DATABASE_ID,
+      collectionId,
+      queries
+    );
   },
-
-  async updateDocument(collectionId: string, documentId: string, data: any) {
-    try {
-      return await databases.updateDocument(
-        DATABASE_ID,
-        collectionId,
-        documentId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async updateDocument(collectionId: string, documentId: string, data: PartialGenericDocData) {
+    return databases.updateDocument(
+      DATABASE_ID,
+      collectionId,
+      documentId,
+      { ...data, updatedAt: new Date().toISOString() }
+    );
   },
-
   async deleteDocument(collectionId: string, documentId: string) {
-    try {
-      return await databases.deleteDocument(
-        DATABASE_ID,
-        collectionId,
-        documentId
-      );
-    } catch (error) {
-      throw error;
-    }
+    return databases.deleteDocument(
+      DATABASE_ID,
+      collectionId,
+      documentId
+    );
   }
 };
 
-// Storage functions
 export const storageService = {
   async uploadFile(file: File) {
-    try {
-      return await storage.createFile(
-        STORAGE_BUCKET_ID,
-        ID.unique(),
-        file
-      );
-    } catch (error) {
-      throw error;
-    }
+    return storage.createFile(
+      STORAGE_BUCKET_ID,
+      ID.unique(),
+      file
+    );
   },
-
   async deleteFile(fileId: string) {
-    try {
-      return await storage.deleteFile(STORAGE_BUCKET_ID, fileId);
-    } catch (error) {
-      throw error;
-    }
+    return storage.deleteFile(STORAGE_BUCKET_ID, fileId);
   },
-
   getFilePreview(fileId: string, width = 400, height = 400) {
     return storage.getFilePreview(STORAGE_BUCKET_ID, fileId, width, height);
   },
-
   getFileDownload(fileId: string) {
     return storage.getFileDownload(STORAGE_BUCKET_ID, fileId);
   },
-
   getFileView(fileId: string) {
     return storage.getFileView(STORAGE_BUCKET_ID, fileId);
   }
 };
 
-export default client;
+export default client; // Export the main client if needed elsewhere, though services are preferred

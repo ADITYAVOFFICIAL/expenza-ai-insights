@@ -1,67 +1,75 @@
-
 import React from 'react';
-import { TrendingUp, TrendingDown, Wallet, Target } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
-const QuickStats = () => {
-  const stats = [
-    {
-      label: 'This Month',
-      value: '₹24,580',
-      change: '+12.5%',
-      trend: 'up',
-      icon: TrendingUp,
-      color: 'text-red-600'
-    },
-    {
-      label: 'Savings',
-      value: '₹8,240',
-      change: '+8.2%',
-      trend: 'up',
-      icon: Wallet,
-      color: 'text-green-600'
-    },
-    {
-      label: 'Goals Progress',
-      value: '67%',
-      change: '+5.1%',
-      trend: 'up',
-      icon: Target,
-      color: 'text-blue-600'
-    },
-    {
-      label: 'Pending Splits',
-      value: '₹1,250',
-      change: '-2.3%',
-      trend: 'down',
-      icon: TrendingDown,
-      color: 'text-orange-600'
-    }
-  ];
+export interface QuickStatProps {
+  title: string;
+  value: string;
+  change?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  icon: LucideIcon;
+  description?: string;
+}
+
+interface QuickStatsProps {
+  stats: QuickStatProps[];
+}
+
+const TrendIcon = ({ trend }: { trend?: 'up' | 'down' | 'neutral' }) => {
+  if (trend === 'up') return <TrendingUp className="w-4 h-4 text-success" />;
+  if (trend === 'down') return <TrendingDown className="w-4 h-4 text-destructive" />;
+  return <Minus className="w-4 h-4 text-muted-foreground" />;
+};
+
+const QuickStats: React.FC<QuickStatsProps> = ({ stats }) => {
+  if (!stats || stats.length === 0) {
+    return (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+            {[...Array(4)].map((_, index) => (
+                 <Card key={index} className="p-3 lg:p-4">
+                    <div className="animate-pulse flex space-x-4">
+                        <div className="rounded-full bg-slate-200 dark:bg-slate-700 h-10 w-10"></div>
+                        <div className="flex-1 space-y-3 py-1">
+                            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                            <div className="space-y-2">
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded col-span-2"></div>
+                                    <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded col-span-1"></div>
+                                </div>
+                                <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            ))}
+        </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {stats.map((stat, index) => (
-        <Card key={index} className="p-4 bg-gradient-to-br from-white to-gray-50/50 border-0 shadow-sm hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg bg-gray-100 ${stat.color}`}>
-                <stat.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-                <p className="text-xl font-bold text-foreground">{stat.value}</p>
-              </div>
+        <Card key={index}>
+          <CardContent className="p-3 lg:p-4">
+            <div className="flex items-center justify-between mb-1 lg:mb-2">
+              <p className="text-xs lg:text-sm text-muted-foreground">{stat.title}</p>
+              <stat.icon className="w-4 h-4 text-muted-foreground" />
             </div>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className={`text-sm font-medium ${
-              stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-            }`}>
-              {stat.change}
-            </span>
-            <span className="text-xs text-muted-foreground">vs last month</span>
-          </div>
+            <h3 className="text-lg lg:text-2xl font-bold text-foreground mb-1">{stat.value}</h3>
+            {stat.change && (
+              <div className="flex items-center text-xs">
+                <TrendIcon trend={stat.trend} />
+                <span className={`ml-1 ${
+                  stat.trend === 'up' ? 'text-success' : stat.trend === 'down' ? 'text-destructive' : 'text-muted-foreground'
+                }`}>
+                  {stat.change}
+                </span>
+              </div>
+            )}
+            {!stat.change && stat.description && (
+                 <p className="text-xs text-muted-foreground">{stat.description}</p>
+            )}
+          </CardContent>
         </Card>
       ))}
     </div>

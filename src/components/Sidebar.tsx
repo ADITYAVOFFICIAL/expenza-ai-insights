@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
@@ -16,17 +15,18 @@ import {
   Calendar,
   Receipt,
   PiggyBank,
-  CreditCard
+  CreditCard // Added CreditCard for Passbook
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
   { icon: Home, label: 'Dashboard', href: '/', category: 'main' },
   { icon: Plus, label: 'Add Expense', href: '/add-expense', category: 'main' },
+  { icon: CreditCard, label: 'Passbook', href: '/passbook', category: 'main' }, // Added Passbook
   { icon: BarChart3, label: 'Analytics', href: '/analytics', category: 'insights' },
   { icon: TrendingUp, label: 'Reports', href: '/reports', category: 'insights' },
   { icon: Users, label: 'Groups', href: '/groups', category: 'social' },
-  { icon: Target, label: 'Goals', href: '/goals', category: 'planning' },
+  { icon: PiggyBank, label: 'Goals', href: '/goals', category: 'planning' }, // Changed icon for Goals
   { icon: Calendar, label: 'Recurring', href: '/recurring', category: 'planning' },
   { icon: User, label: 'Profile', href: '/profile', category: 'account' },
 ];
@@ -35,7 +35,7 @@ const categoryIcons = {
   main: Receipt,
   insights: BarChart3,
   social: Users,
-  planning: Target,
+  planning: Target, // Kept Target for planning section title
   account: User
 };
 
@@ -63,7 +63,7 @@ const Sidebar = () => {
         {/* Main Actions */}
         <div className="space-y-1 lg:space-y-2">
           <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
-            <Receipt className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
+            <categoryIcons.main className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Main</span>
           </div>
           {sidebarItems.filter(item => item.category === 'main').map((item) => {
@@ -93,7 +93,7 @@ const Sidebar = () => {
         {/* Insights */}
         <div className="space-y-1 lg:space-y-2">
           <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
-            <BarChart3 className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
+            <categoryIcons.insights className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Insights</span>
           </div>
           {sidebarItems.filter(item => item.category === 'insights').map((item) => {
@@ -123,7 +123,7 @@ const Sidebar = () => {
         {/* Social & Planning */}
         <div className="space-y-1 lg:space-y-2">
           <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
-            <Users className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
+            <categoryIcons.social className="w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Social & Planning</span>
           </div>
           {sidebarItems.filter(item => ['social', 'planning'].includes(item.category)).map((item) => {
@@ -155,18 +155,31 @@ const Sidebar = () => {
       <div className="p-3 lg:p-4 border-t border-border space-y-1 lg:space-y-2">
         <Link
           to="/profile"
-          className="flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          onClick={() => setIsMobileOpen(false)}
+          className={cn(
+            "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
+            location.pathname === "/profile"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
         >
           <User className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
           <span className="font-medium text-sm lg:text-base">Profile</span>
         </Link>
-        <Link
+        {/* Example: Settings link, if you have a settings page */}
+        {/* <Link
           to="/settings"
-          className="flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+          onClick={() => setIsMobileOpen(false)}
+          className={cn(
+            "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
+            location.pathname === "/settings"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
         >
           <Settings className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
           <span className="font-medium text-sm lg:text-base">Settings</span>
-        </Link>
+        </Link> */}
       </div>
     </div>
   );
@@ -190,7 +203,7 @@ const Sidebar = () => {
       {isMobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 sm:w-72 border-r border-border shadow-lg">
+          <div className="absolute left-0 top-0 bottom-0 w-64 sm:w-72 border-r border-border shadow-lg bg-card"> {/* Added bg-card here */}
             <div className="flex justify-end p-3">
               <button
                 onClick={() => setIsMobileOpen(false)}

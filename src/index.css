@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,8 +5,8 @@
 /* Design system optimized for Expenza - Splitwise-like experience */
 
 @layer base {
-  :root {
-    --background: 248 250 252;
+  :root { /* Light theme variables */
+    --background: 248 250 252; /* HSL: 248, 50%, 98% (example, actual values may differ) */
     --foreground: 15 23 42;
 
     --card: 255 255 255;
@@ -16,7 +15,7 @@
     --popover: 255 255 255;
     --popover-foreground: 15 23 42;
 
-    --primary: 16 185 129;
+    --primary: 16 185 129; /* Default primary color (e.g., a green) */
     --primary-foreground: 255 255 255;
 
     --secondary: 241 245 249;
@@ -25,7 +24,7 @@
     --muted: 241 245 249;
     --muted-foreground: 100 116 139;
 
-    --accent: 59 130 246;
+    --accent: 59 130 246; /* Default accent color (e.g., a blue) */
     --accent-foreground: 255 255 255;
 
     --destructive: 239 68 68;
@@ -33,7 +32,7 @@
 
     --border: 226 232 240;
     --input: 226 232 240;
-    --ring: 16 185 129;
+    --ring: 16 185 129; /* Ring color, often matches primary */
 
     --success: 16 185 129;
     --warning: 245 158 11;
@@ -42,17 +41,18 @@
 
     --radius: 0.75rem;
 
+    /* Sidebar specific colors */
     --sidebar-background: 255 255 255;
     --sidebar-foreground: 71 85 105;
-    --sidebar-primary: 16 185 129;
+    --sidebar-primary: 16 185 129; /* Matches default primary */
     --sidebar-primary-foreground: 255 255 255;
     --sidebar-accent: 241 245 249;
     --sidebar-accent-foreground: 51 65 85;
     --sidebar-border: 226 232 240;
-    --sidebar-ring: 16 185 129;
+    --sidebar-ring: 16 185 129; /* Matches default ring/primary */
   }
 
-  .dark {
+  .dark { /* Dark theme variables */
     --background: 2 8 23;
     --foreground: 248 250 252;
 
@@ -62,7 +62,7 @@
     --popover: 15 23 42;
     --popover-foreground: 248 250 252;
 
-    --primary: 16 185 129;
+    --primary: 16 185 129; /* Default primary for dark mode */
     --primary-foreground: 2 8 23;
 
     --secondary: 30 41 59;
@@ -71,7 +71,7 @@
     --muted: 30 41 59;
     --muted-foreground: 148 163 184;
 
-    --accent: 59 130 246;
+    --accent: 59 130 246; /* Default accent for dark mode */
     --accent-foreground: 2 8 23;
 
     --destructive: 239 68 68;
@@ -81,6 +81,7 @@
     --input: 30 41 59;
     --ring: 16 185 129;
 
+    /* Sidebar specific colors for dark mode */
     --sidebar-background: 15 23 42;
     --sidebar-foreground: 148 163 184;
     --sidebar-primary: 16 185 129;
@@ -94,7 +95,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border; /* Apply border color globally */
   }
 
   body {

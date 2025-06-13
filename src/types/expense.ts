@@ -1,21 +1,24 @@
-
 export interface Expense {
-  id: string;
+  $id?: string;
+  userId: string;
   name: string;
   amount: number;
   category: string;
-  bank: string;
-  paymentApp: string;
   date: string;
+  paymentMethod: string;
+  bank?: string;
   notes?: string;
-  billImage?: string;
-  paidBy: string;
-  splitBetween: string[];
   isRecurring?: boolean;
-  recurringInterval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  isSettled: boolean;
+  recurrenceFrequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  recurrenceEndDate?: string;
   groupId?: string;
-  currency: string;
+  receiptImageUrl?: string;
+  tags?: string[];
+  location?: string;
+  currency?: string;
+  splitWith?: Array<{ userId: string; amount: number; isSettled?: boolean }>;
+  $createdAt?: string;
+  $updatedAt?: string;
 }
 
 export interface ExpenseCategory {
@@ -34,36 +37,65 @@ export interface PaymentApp {
 export interface Bank {
   id: string;
   name: string;
-  balance: number;
+  balance?: number;
   accountNumber?: string;
 }
 
 export interface Group {
-  id: string;
+  $id?: string;
   name: string;
   description?: string;
   members: string[];
   createdBy: string;
-  createdAt: string;
-  totalExpenses: number;
+  $createdAt?: string;
+  totalExpenses?: number;
 }
 
 export interface Goal {
-  id: string;
+  $id?: string;
+  userId: string;
   name: string;
   targetAmount: number;
   currentAmount: number;
   targetDate: string;
   category?: string;
-  isAchieved: boolean;
+  isAchieved?: boolean;
+  $createdAt?: string;
+  $updatedAt?: string;
 }
 
-export interface User {
-  id: string;
+export interface RecurringExpense {
+  $id?: string;
+  userId: string;
+  name: string;
+  amount: number;
+  category: string; // e.g., 'utilities', 'subscription', 'loan'
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  nextDueDate: string; // ISO date string (e.g., "2024-03-15")
+  isActive: boolean;
+  bank?: string; // Optional: Associated bank name
+  paymentMethod?: string; // Optional: e.g., 'Credit Card', 'Auto Debit'
+  notes?: string; // Optional
+  lastPaidDate?: string; // Optional: ISO date string of the last payment
+  $createdAt?: string;
+  $updatedAt?: string;
+}
+
+export interface UserProfile {
+  $id: string;
   name: string;
   email: string;
-  profileImage?: string;
-  phoneNumber?: string;
-  currency: string;
-  parentAccess?: boolean;
+  profilePictureUrl?: string;
+  preferredCurrency?: string;
+  age?: number;
+  occupation?: string;
+  incomeLevel?: string;
+  financialKnowledge?: 'beginner' | 'intermediate' | 'advanced';
+  riskTolerance?: 'low' | 'medium' | 'high';
+  primaryBank?: string;
+  phoneNumber?: string; // Added from Profile.tsx
+  avatarUrl?: string; // Added from Profile.tsx (consistent with profilePictureUrl)
+  currency?: string; // Added from Profile.tsx (consistent with preferredCurrency)
+  $createdAt?: string;
+  $updatedAt?: string;
 }

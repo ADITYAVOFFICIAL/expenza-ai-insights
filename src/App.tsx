@@ -19,6 +19,7 @@ import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import PassBook from "./pages/Passbook";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,7 @@ const AppContent = () => {
           <Route path="goals" element={<Goals />} />
           <Route path="recurring" element={<Recurring />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="passbook" element={<PassBook />} />
           <Route path="profile" element={<Profile />} />
         </Route>
         <Route path="*" element={<NotFound />} />

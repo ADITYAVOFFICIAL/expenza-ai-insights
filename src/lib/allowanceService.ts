@@ -1,6 +1,5 @@
-
-import { databaseService, DATABASE_ID } from './appwrite';
-import { ID } from 'appwrite';
+import { databaseService, COLLECTIONS } from './appwrite';
+import { ID, Query } from 'appwrite';
 
 export interface Allowance {
   id: string;
@@ -11,61 +10,50 @@ export interface Allowance {
   isActive: boolean;
   userId: string;
   createdAt: string;
+  updatedAt?: string; // Added for consistency if Appwrite auto-updates this
 }
 
 export const allowanceService = {
-  async createAllowance(data: Omit<Allowance, 'id' | 'createdAt'>) {
-    try {
-      return await databaseService.createDocument(
-        DATABASE_ID,
-        'allowances',
-        ID.unique(),
-        {
-          ...data,
-          createdAt: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      throw error;
-    }
+  async createAllowance(data: Omit<Allowance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Allowance> {
+    const document = await databaseService.createDocument(
+      COLLECTIONS.ALLOWANCES,
+      {
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      ID.unique()
+    );
+    return document as unknown as Allowance;
   },
 
-  async getAllowances(userId: string) {
-    try {
-      return await databaseService.listDocuments(
-        DATABASE_ID,
-        'allowances',
-        [
-          // Add query filters for user
-        ]
-      );
-    } catch (error) {
-      throw error;
-    }
+  async getAllowances(userId: string): Promise<Allowance[]> {
+    const response = await databaseService.listDocuments(
+      COLLECTIONS.ALLOWANCES,
+      [
+        Query.equal('userId', userId),
+        Query.orderDesc('createdAt')
+      ]
+    );
+    return response.documents as unknown as Allowance[];
   },
 
-  async updateAllowance(allowanceId: string, data: Partial<Allowance>) {
-    try {
-      return await databaseService.updateDocument(
-        DATABASE_ID,
-        'allowances',
-        allowanceId,
-        data
-      );
-    } catch (error) {
-      throw error;
-    }
+  async updateAllowance(allowanceId: string, data: Partial<Omit<Allowance, 'id' | 'createdAt' | 'userId'>>): Promise<Allowance> {
+    const document = await databaseService.updateDocument(
+      COLLECTIONS.ALLOWANCES,
+      allowanceId,
+      {
+        ...data,
+        updatedAt: new Date().toISOString(),
+      }
+    );
+    return document as unknown as Allowance;
   },
 
-  async deleteAllowance(allowanceId: string) {
-    try {
-      return await databaseService.deleteDocument(
-        DATABASE_ID,
-        'allowances',
-        allowanceId
-      );
-    } catch (error) {
-      throw error;
-    }
+  async deleteAllowance(allowanceId: string): Promise<void> {
+    await databaseService.deleteDocument(
+      COLLECTIONS.ALLOWANCES,
+      allowanceId
+    );
   }
 };
