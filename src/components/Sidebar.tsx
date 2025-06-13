@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion'; // Added framer-motion
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
   Plus, 
@@ -8,7 +8,6 @@ import {
   Users, 
   Target, 
   User, 
-  Settings,
   Menu,
   X,
   Wallet,
@@ -29,7 +28,6 @@ const sidebarItems = [
   { icon: Users, label: 'Groups', href: '/groups', category: 'social' },
   { icon: PiggyBank, label: 'Goals', href: '/goals', category: 'planning' },
   { icon: Calendar, label: 'Recurring', href: '/recurring', category: 'planning' },
-  { icon: User, label: 'Profile', href: '/profile', category: 'account' },
 ];
 
 const categoryIcons = {
@@ -37,23 +35,18 @@ const categoryIcons = {
   insights: BarChart3,
   social: Users,
   planning: Target,
-  account: User
 };
 
-const Sidebar = () => {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+interface SidebarContentInternalProps {
+  showLogo?: boolean;
+  onLinkClick: () => void; 
+}
+
+const SidebarContentInternal: React.FC<SidebarContentInternalProps> = ({ showLogo = true, onLinkClick }) => {
   const location = useLocation();
 
-  // Define props for SidebarContentInternal
-  interface SidebarContentInternalProps {
-    showLogo?: boolean;
-  }
-
-  // SidebarContent remains largely the same, its internal responsive classes handle text/icon sizes
-  const SidebarContentInternal = ({ showLogo = true }: SidebarContentInternalProps) => (
-    // Removed h-full and bg-card from here as the animated panel will handle it
-    <div className="flex flex-col flex-1"> {/* Added flex-1 to allow nav to grow */}
-      {/* Logo */}
+  return (
+    <div className="flex flex-col flex-1">
       {showLogo && (
         <div className="p-4 lg:p-6 border-b border-border">
           <div className="flex items-center space-x-3">
@@ -68,8 +61,7 @@ const Sidebar = () => {
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6 overflow-y-auto">
+      <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6 overflow-y-auto no-scrollbar">
         {/* Main Actions */}
         <div className="space-y-1 lg:space-y-2">
           <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
@@ -82,7 +74,7 @@ const Sidebar = () => {
               <Link
                 key={item.href}
                 to={item.href}
-                onClick={() => setIsMobileOpen(false)}
+                onClick={onLinkClick}
                 className={cn(
                   "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
@@ -112,7 +104,7 @@ const Sidebar = () => {
               <Link
                 key={item.href}
                 to={item.href}
-                onClick={() => setIsMobileOpen(false)}
+                onClick={onLinkClick}
                 className={cn(
                   "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
@@ -142,7 +134,7 @@ const Sidebar = () => {
               <Link
                 key={item.href}
                 to={item.href}
-                onClick={() => setIsMobileOpen(false)}
+                onClick={onLinkClick}
                 className={cn(
                   "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
                   isActive 
@@ -165,7 +157,7 @@ const Sidebar = () => {
       <div className="p-3 lg:p-4 border-t border-border space-y-1 lg:space-y-2">
         <Link
           to="/profile"
-          onClick={() => setIsMobileOpen(false)}
+          onClick={onLinkClick}
           className={cn(
             "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
             location.pathname === "/profile"
@@ -176,32 +168,42 @@ const Sidebar = () => {
           <User className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
           <span className="font-medium text-sm lg:text-base">Profile</span>
         </Link>
-        {/* Settings link can be added here if needed */}
       </div>
     </div>
   );
+};
+
+const Sidebar = () => {
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const openMobileSidebar = () => {
+    setIsMobileOpen(true);
+  };
+
+  const closeMobileSidebar = () => {
+    setIsMobileOpen(false);
+  };
 
   return (
     <>
       {/* Mobile menu button */}
       <button
-        onClick={() => setIsMobileOpen(true)}
+        onClick={openMobileSidebar}
         aria-label="Open sidebar"
-        // Refined styling for mobile trigger
         className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-md bg-card border border-border shadow-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
       >
         <Menu className="w-5 h-5 text-foreground" />
       </button>
 
-      {/* Desktop sidebar (unchanged) */}
+      {/* Desktop sidebar */}
       <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 xl:w-72 border-r border-border shadow-sm bg-card">
-        <SidebarContentInternal />
+        <SidebarContentInternal showLogo={true} onLinkClick={() => { /* No action needed for desktop links */ }} />
       </div>
 
       {/* Mobile sidebar overlay with animations */}
       <AnimatePresence>
         {isMobileOpen && (
-          <div className="lg:hidden fixed inset-0 z-[60] flex" aria-modal="true"> {/* Increased z-index for overlay */}
+          <div key="mobile-sidebar-wrapper" className="lg:hidden fixed inset-0 z-[60] flex" aria-modal="true">
             {/* Backdrop */}
             <motion.div
               key="backdrop"
@@ -209,8 +211,8 @@ const Sidebar = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
-              className="absolute inset-0 bg-black/60" // Slightly darker backdrop
-              onClick={() => setIsMobileOpen(false)}
+              className="absolute inset-0 bg-black/60"
+              onClick={closeMobileSidebar}
             />
             
             {/* Sidebar Panel */}
@@ -219,7 +221,7 @@ const Sidebar = () => {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 320, damping: 35, duration: 0.3 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="relative z-10 h-full w-64 sm:w-72 bg-card border-r border-border shadow-xl flex flex-col"
             >
               {/* Mobile Sidebar Header with Close Button */}
@@ -231,7 +233,7 @@ const Sidebar = () => {
                   <h1 className="text-md font-bold text-foreground">DigiSamahārta</h1>
                 </div>
                 <button
-                  onClick={() => setIsMobileOpen(false)}
+                  onClick={closeMobileSidebar}
                   aria-label="Close sidebar"
                   className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
                 >
@@ -241,7 +243,7 @@ const Sidebar = () => {
               
               {/* Scrollable content area for mobile sidebar */}
               <div className="flex-1 overflow-y-auto">
-                <SidebarContentInternal showLogo={false} />
+                <SidebarContentInternal showLogo={false} onLinkClick={closeMobileSidebar} />
               </div>
             </motion.div>
           </div>

@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "./components/Layout";
-import PublicLayout from "@/components/PublicLayout"; // <-- Import PublicLayout
 import { Wallet } from "lucide-react"; // Import the Wallet icon
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';
@@ -75,9 +74,8 @@ const AppContent = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            {/* Wrap Privacy and TOS with PublicLayout */}
-            <Route path="/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
-            <Route path="/terms" element={<PublicLayout><Tos /></PublicLayout>} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Tos />} />
             <Route path="*" element={<LandingPage />} /> {/* LandingPage might have its own header/footer */}
           </Routes>
         </Suspense>

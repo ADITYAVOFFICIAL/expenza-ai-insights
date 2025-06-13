@@ -39,16 +39,16 @@ const Header = () => {
         {/* Search Area Removed */}
 
         {/* Actions Area */}
-        {/* Adjusted spacing: space-x-1 for smallest, sm:space-x-2, md:space-x-3 */}
-        <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-3">
+        {/* Adjusted spacing: space-x-1 sm:space-x-2 md:space-x-3 */}
+        <div className="flex items-center space-x-2 md:space-x-3"> {/* Adjusted base space-x */}
           {/* Quick Add Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               {/* Adjusted button padding for smallest screens when text is hidden */}
               <Button size="sm" className="h-9 gap-1.5 px-2 sm:px-3">
                 <Plus className="h-4 w-4" />
-                {/* Hide "Add" text on smallest screens, show from sm upwards */}
-                <span className="hidden sm:inline text-xs sm:text-sm">Add</span>
+                {/* Show "Add" text always */}
+                <span className="text-xs sm:text-sm">Add</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -65,7 +65,10 @@ const Header = () => {
           </DropdownMenu>
 
           {/* Theme Toggle */}
-          <ThemeToggle />
+          {/* Added margin for gap */}
+          <div className="ml-1 sm:ml-0"> {/* Add left margin for small screens, remove for sm+ as space-x handles it */}
+            <ThemeToggle />
+          </div>
 
           {/* Profile Dropdown */}
           <DropdownMenu>
