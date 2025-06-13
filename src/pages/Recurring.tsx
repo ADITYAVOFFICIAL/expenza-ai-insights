@@ -13,6 +13,13 @@ import { databaseService } from '@/lib/appwrite';
 import { RecurringExpense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { format, differenceInDays, parseISO, isValid } from 'date-fns';
+import banksData from '@/data/banks.json'; // Import bank data
+import paymentAppsData from '@/data/paymentApps.json'; // Import payment app data
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'; // Import Popover
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'; // Import Command components
+import { Check, ChevronsUpDown } from 'lucide-react'; // Import Check and ChevronsUpDown
+import { cn } from '@/lib/utils'; // Import cn utility
+import { Allowance } from '@/lib/allowanceService'; // Import Allowance type
 
 interface RecurringFormState {
   name: string;
@@ -23,6 +30,11 @@ interface RecurringFormState {
   bank: string;
   paymentMethod: string;
   notes: string;
+}
+
+interface BankSuggestion {
+  name: string;
+  icon?: string;
 }
 
 const initialRecurringFormState: RecurringFormState = {
@@ -49,6 +61,38 @@ const Recurring = () => {
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [editFormState, setEditFormState] = useState<RecurringFormState>(initialRecurringFormState);
   const [showEditDialog, setShowEditDialog] = useState(false);
+
+  const [bankSuggestions, setBankSuggestions] = useState<BankSuggestion[]>([]);
+  const [bankPopoverOpen, setBankPopoverOpen] = useState(false);
+  const [paymentMethodPopoverOpen, setPaymentMethodPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchBankSuggestionsFromAllowances = async () => {
+      if (user?.$id) {
+        try {
+          const allowancesRes = await databaseService.getAllowances(user.$id);
+          const allowancesDocs = (allowancesRes.documents as unknown as Allowance[]);
+          
+          const uniqueBankNames = new Set<string>();
+          allowancesDocs.forEach(allowance => {
+            if (allowance.bankName) {
+              uniqueBankNames.add(allowance.bankName);
+            }
+          });
+
+          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
+            const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+            return { name, icon: bankFromFile?.icon };
+          });
+          
+          setBankSuggestions(suggestions); // Suggestions will now only contain banks from allowances
+        } catch (error) {
+          console.error("Error fetching bank suggestions for recurring form:", error);
+        }
+      }
+    };
+    fetchBankSuggestionsFromAllowances();
+  }, [user]);
 
 
   const fetchRecurringExpenses = useCallback(async () => {
@@ -247,67 +291,178 @@ const Recurring = () => {
     formState: RecurringFormState, 
     setFormState: React.Dispatch<React.SetStateAction<RecurringFormState>>,
     formType: 'create' | 'edit'
-  ) => (
-    <div className="space-y-4 py-4">
-      <div>
-        <Label htmlFor={`${formType}-recurringName`}>Expense Name *</Label>
-        <Input id={`${formType}-recurringName`} value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} placeholder="e.g., Netflix Subscription" />
-      </div>
-      <div>
-        <Label htmlFor={`${formType}-recurringAmount`}>Amount (₹) *</Label>
-        <Input id={`${formType}-recurringAmount`} type="number" value={formState.amount} onChange={(e) => setFormState({ ...formState, amount: e.target.value })} placeholder="599" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+  ) => {
+    const selectedBankData = bankSuggestions.find(b => b.name === formState.bank);
+    const selectedPaymentMethodData = paymentAppsData.find(p => p.id === formState.paymentMethod || p.name === formState.paymentMethod);
+
+    return (
+      <div className="space-y-4 py-4">
         <div>
-          <Label htmlFor={`${formType}-recurringCategory`}>Category</Label>
-          <Select value={formState.category} onValueChange={(value) => setFormState({ ...formState, category: value })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="utilities">Utilities</SelectItem>
-              <SelectItem value="entertainment">Entertainment</SelectItem>
-              <SelectItem value="health">Health</SelectItem>
-              <SelectItem value="housing">Housing</SelectItem>
-              <SelectItem value="insurance">Insurance</SelectItem>
-              <SelectItem value="transport">Transport</SelectItem>
-              <SelectItem value="loan">Loan</SelectItem>
-              <SelectItem value="subscription">Subscription</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor={`${formType}-recurringName`}>Expense Name *</Label>
+          <Input id={`${formType}-recurringName`} value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} placeholder="e.g., Netflix Subscription" />
         </div>
         <div>
-          <Label htmlFor={`${formType}-recurringFrequency`}>Frequency</Label>
-          <Select value={formState.frequency} onValueChange={(value: any) => setFormState({ ...formState, frequency: value })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label htmlFor={`${formType}-recurringAmount`}>Amount (₹) *</Label>
+          <Input id={`${formType}-recurringAmount`} type="number" value={formState.amount} onChange={(e) => setFormState({ ...formState, amount: e.target.value })} placeholder="599" />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formType}-recurringCategory`}>Category</Label>
+            <Select value={formState.category} onValueChange={(value) => setFormState({ ...formState, category: value })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="utilities">Utilities</SelectItem>
+                <SelectItem value="entertainment">Entertainment</SelectItem>
+                <SelectItem value="health">Health</SelectItem>
+                <SelectItem value="housing">Housing</SelectItem>
+                <SelectItem value="insurance">Insurance</SelectItem>
+                <SelectItem value="transport">Transport</SelectItem>
+                <SelectItem value="loan">Loan</SelectItem>
+                <SelectItem value="subscription">Subscription</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-recurringFrequency`}>Frequency</Label>
+            <Select value={formState.frequency} onValueChange={(value: any) => setFormState({ ...formState, frequency: value })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label htmlFor={`${formType}-recurringNextDue`}>Next Due Date *</Label>
+          <Input id={`${formType}-recurringNextDue`} type="date" value={formState.nextDueDate} onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formType}-recurringBank`}>Bank (Optional)</Label>
+            <Popover open={bankPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')} onOpenChange={(open) => setBankPopoverOpen(open)}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={bankPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')}
+                  className="w-full justify-between font-normal h-10 mt-1"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {selectedBankData?.icon && (
+                      <img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {formState.bank || "Select or type bank..."}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search bank or type new..."
+                    value={formState.bank}
+                    onValueChange={(searchValue) => setFormState({ ...formState, bank: searchValue })}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {formState.bank ? `Add "${formState.bank}" as new bank` : "No bank found. Type to add."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {bankSuggestions.map((suggestion) => (
+                        <CommandItem
+                          key={suggestion.name}
+                          value={suggestion.name}
+                          onSelect={(currentValue) => {
+                            setFormState({ ...formState, bank: currentValue });
+                            setBankPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formState.bank === suggestion.name ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {suggestion.icon && (
+                            <img src={suggestion.icon} alt={suggestion.name} className="w-4 h-4 object-contain mr-2" />
+                          )}
+                          {suggestion.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-recurringPaymentApp`}>Payment Method (Optional)</Label>
+            <Popover open={paymentMethodPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')} onOpenChange={(open) => setPaymentMethodPopoverOpen(open)}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={paymentMethodPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')}
+                  className="w-full justify-between font-normal h-10 mt-1"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {selectedPaymentMethodData?.icon && (
+                      <img src={selectedPaymentMethodData.icon} alt={selectedPaymentMethodData.name} className="w-4 h-4 object-contain flex-shrink-0 rounded" />
+                    )}
+                    <span className="truncate">
+                      {selectedPaymentMethodData?.name || formState.paymentMethod || "Select payment method..."}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Search payment method..." />
+                  <CommandList>
+                    <CommandEmpty>No payment method found.</CommandEmpty>
+                    <CommandGroup>
+                      {paymentAppsData.map((app) => (
+                        <CommandItem
+                          key={app.id}
+                          value={app.name} // Use name for display and search
+                          onSelect={() => {
+                            setFormState({ ...formState, paymentMethod: app.id }); // Store ID
+                            setPaymentMethodPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formState.paymentMethod === app.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {app.icon && (
+                            <img src={app.icon} alt={app.name} className="w-4 h-4 object-contain mr-2 rounded" />
+                          )}
+                          {app.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+          <div>
+          <Label htmlFor={`${formType}-recurringNotes`}>Notes (Optional)</Label>
+          <Input id={`${formType}-recurringNotes`} value={formState.notes} onChange={(e) => setFormState({ ...formState, notes: e.target.value })} placeholder="Additional details" />
         </div>
       </div>
-      <div>
-        <Label htmlFor={`${formType}-recurringNextDue`}>Next Due Date *</Label>
-        <Input id={`${formType}-recurringNextDue`} type="date" value={formState.nextDueDate} onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor={`${formType}-recurringBank`}>Bank (Optional)</Label>
-          <Input id={`${formType}-recurringBank`} value={formState.bank} onChange={(e) => setFormState({ ...formState, bank: e.target.value })} placeholder="e.g., HDFC Bank" />
-        </div>
-        <div>
-          <Label htmlFor={`${formType}-recurringPaymentApp`}>Payment Method (Optional)</Label>
-          <Input id={`${formType}-recurringPaymentApp`} value={formState.paymentMethod} onChange={(e) => setFormState({ ...formState, paymentMethod: e.target.value })} placeholder="e.g., UPI, Card" />
-        </div>
-      </div>
-        <div>
-        <Label htmlFor={`${formType}-recurringNotes`}>Notes (Optional)</Label>
-        <Input id={`${formType}-recurringNotes`} value={formState.notes} onChange={(e) => setFormState({ ...formState, notes: e.target.value })} placeholder="Additional details" />
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
@@ -316,7 +471,18 @@ const Recurring = () => {
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Recurring Expenses</h1>
           <p className="text-muted-foreground text-sm lg:text-base">Manage your regular bills and subscriptions</p>
         </div>
-        <Dialog open={showCreateDialog} onOpenChange={(isOpen) => { setShowCreateDialog(isOpen); if (!isOpen) setCreateFormState(initialRecurringFormState); }}>
+        {/* Create Dialog */}
+        <Dialog 
+          open={showCreateDialog} 
+          onOpenChange={(isOpen) => { 
+            setShowCreateDialog(isOpen); 
+            if (!isOpen) {
+              setCreateFormState(initialRecurringFormState); 
+              setBankPopoverOpen(false); // Reset bank popover open state
+              setPaymentMethodPopoverOpen(false); // Reset payment method popover open state
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button className="w-full sm:w-auto" onClick={() => { setCreateFormState(initialRecurringFormState); setShowCreateDialog(true); }}>
               <Plus className="w-4 h-4 mr-2" />
@@ -413,6 +579,9 @@ const Recurring = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         {recurringExpenses.map((expense) => {
           const dueDateInfo = getDaysUntilDue(expense.nextDueDate);
+          const bankDetails = expense.bank ? banksData.find(b => b.name.toLowerCase() === expense.bank!.toLowerCase()) : undefined;
+          const paymentAppDetail = expense.paymentMethod ? paymentAppsData.find(p => p.id.toLowerCase() === expense.paymentMethod!.toLowerCase() || p.name.toLowerCase() === expense.paymentMethod!.toLowerCase()) : undefined;
+
           return (
             <Card key={expense.$id} className={!expense.isActive ? 'opacity-60' : ''}>
               <CardHeader>
@@ -446,9 +615,31 @@ const Recurring = () => {
                     </div>
                   </div>
                   {(expense.bank || expense.paymentMethod) && (
-                    <div className="grid grid-cols-2 gap-4">
-                        {expense.bank && <div><div className="text-sm text-muted-foreground">Bank</div><div className="font-medium">{expense.bank}</div></div>}
-                        {expense.paymentMethod && <div><div className="text-sm text-muted-foreground">Payment Method</div><div className="font-medium">{expense.paymentMethod}</div></div>}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {expense.bank && (
+                        <div>
+                          <div className="text-sm text-muted-foreground">Bank</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {bankDetails?.icon && (
+                              <img src={bankDetails.icon} alt={bankDetails.name} className="w-4 h-4 object-contain" />
+                            )}
+                            <span>{expense.bank}</span>
+                          </div>
+                        </div>
+                      )}
+                      {expense.paymentMethod && (
+                        <div>
+                          <div className="text-sm text-muted-foreground">Payment Method</div>
+                          <div className="font-medium flex items-center gap-2">
+                            {paymentAppDetail?.icon ? (
+                              <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-4 h-4 object-contain rounded" />
+                            ) : (
+                              <CreditCard className="w-4 h-4 text-muted-foreground" /> // Fallback icon
+                            )}
+                            <span>{paymentAppDetail?.name || expense.paymentMethod}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {expense.category && <div><div className="text-sm text-muted-foreground">Category</div><Badge variant="outline" className="capitalize">{expense.category}</Badge></div>}
@@ -472,10 +663,21 @@ const Recurring = () => {
       
       {/* Edit Dialog */}
       {editingExpenseId && (
-        <Dialog open={showEditDialog} onOpenChange={(isOpen) => { setShowEditDialog(isOpen); if (!isOpen) setEditingExpenseId(null); }}>
+        <Dialog 
+          open={showEditDialog} 
+          onOpenChange={(isOpen) => { 
+            setShowEditDialog(isOpen); 
+            if (!isOpen) {
+              setEditingExpenseId(null); 
+              setEditFormState(initialRecurringFormState); // Reset edit form state
+              setBankPopoverOpen(false); // Reset bank popover open state
+              setPaymentMethodPopoverOpen(false); // Reset payment method popover open state
+            }
+          }}
+        >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle>
+                  <DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle>
                 </DialogHeader>
                 {renderRecurringForm(editFormState, setEditFormState, 'edit')}
                 <DialogFooter>

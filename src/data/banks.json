@@ -1,0 +1,72 @@
+[
+  {
+    "id": "sbi",
+    "name": "State Bank of India",
+    "icon": "https://upload.wikimedia.org/wikipedia/commons/c/cc/SBI-logo.svg"
+  },
+  {
+    "id": "hdfc",
+    "name": "HDFC Bank",
+    "icon": "https://companieslogo.com/img/orig/HDB-bb6241fe.png?t=1720244492"
+  },
+  {
+    "id": "icici",
+    "name": "ICICI Bank",
+    "icon": "https://companieslogo.com/img/orig/IBN-af38b5c0.png?t=1720244492"
+  },
+  {
+    "id": "axis",
+    "name": "Axis Bank",
+    "icon": "https://companieslogo.com/img/orig/AXISBANK.BO-8f59e95b.png?t=1720244490"
+  },
+  {
+    "id": "kotak",
+    "name": "Kotak Mahindra Bank",
+    "icon": "https://companieslogo.com/img/orig/KOTAKBANK.NS-36440c5e.png?t=1720244492"
+  },
+  {
+    "id": "pnb",
+    "name": "Punjab National Bank",
+    "icon": "https://seeklogo.com/images/P/punjab-national-bank-logo-D9EF96A3CD-seeklogo.com.png"
+  },
+  {
+    "id": "bob",
+    "name": "Bank of Baroda",
+    "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRYxD84WIHwHdkTykFfZX2T87moCZ-eKNtHOg&s"
+  },
+  {
+    "id": "boi",
+    "name": "Bank of India",
+    "icon": "https://companieslogo.com/img/orig/BANKINDIA.NS-e3d88e01.png?t=1720244490"
+  },
+  {
+    "id": "union",
+    "name": "Union Bank of India",
+    "icon": "https://companieslogo.com/img/orig/UNIONBANK.NS-5bba728d.png?t=1720244494"
+  },
+  {
+    "id": "canara",
+    "name": "Canara Bank",
+    "icon": "https://companieslogo.com/img/orig/CANBK.NS-94324ae3.png?t=1720244491"
+  },
+  {
+    "id": "idbi",
+    "name": "IDBI Bank",
+    "icon": "https://companieslogo.com/img/orig/IDBI.NS-1e2d35e6.png?t=1745688100"
+  },
+  {
+    "id": "indusind",
+    "name": "IndusInd Bank",
+    "icon": "https://companieslogo.com/img/orig/INDUSINDBK.NS-29bfd69e.png?t=1720244492"
+  },
+  {
+    "id": "yes",
+    "name": "Yes Bank",
+    "icon": "https://companieslogo.com/img/orig/YESBANK.NS-a31ff15a.png?t=1720244494"
+  },
+  {
+    "id": "other",
+    "name": "Other Bank",
+    "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSkW23QGL2AWJ_fHQW9VDYZCmCKlsedQ2BvA&s"
+  }
+]

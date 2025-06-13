@@ -11,14 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 // Example: `16 85% 50%` (hue, saturation percentage, lightness percentage)
 // The values in your `index.css` (e.g., `16 185 129`) seem to be direct H, S, L values where S and L might not be percentages.
 // Ensure these values are compatible with how `hsl()` is used.
-// For consistency with `index.css`, we'll use the space-separated number format.
+// For consistency with `index.css`, we'll use the space-separated number format with percentages for S and L.
 const themeColors = [
-  { name: 'Default Green', primary: '16 185 129', accent: '59 130 246' }, // Matches index.css default
-  { name: 'Blue Ocean', primary: '59 130 246', accent: '16 185 129' },    // Swaps primary and accent
-  { name: 'Purple Dream', primary: '260 70 50', accent: '330 80 60' }, // Example: Purple primary, Pink accent
-  { name: 'Orange Sunset', primary: '30 90 55', accent: '10 85 50' },  // Example: Orange primary, Red-Orange accent
-  { name: 'Rose Gold', primary: '330 80 70', accent: '35 90 65' },    // Example: Pink-Rose primary, Gold accent
-  { name: 'Emerald Forest', primary: '150 70 35', accent: '160 60 45' } // Example: Dark Green primary, Teal accent
+  { name: 'Default Green', primary: '150 60% 45%', accent: '210 70% 55%' },
+  { name: 'Blue Ocean', primary: '210 70% 55%', accent: '150 60% 45%' },
+  { name: 'Purple Dream', primary: '260 70% 50%', accent: '330 80% 60%' },
+  { name: 'Orange Sunset', primary: '30 90% 55%', accent: '10 85% 50%' },
+  { name: 'Rose Gold', primary: '330 80% 70%', accent: '35 90% 65%' },
+  { name: 'Emerald Forest', primary: '150 70% 35%', accent: '160 60% 45%' }
 ];
 
 interface ThemeCustomizerProps {

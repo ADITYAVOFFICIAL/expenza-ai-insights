@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,52 @@ import ExpenseForm from '@/components/ExpenseForm';
 import { Expense } from '@/types/expense';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, GenericDocData } from '@/lib/appwrite';
+import { Allowance } from '@/lib/allowanceService';
+import banksData from '@/data/banks.json'; // Import the new bank data
+
+interface BankSuggestion {
+  name: string;
+  icon?: string;
+}
 
 const AddExpense = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
+  const [bankSuggestions, setBankSuggestions] = useState<BankSuggestion[]>([]); // Use this instead
+
+  useEffect(() => {
+    const fetchBankSuggestionsFromAllowances = async () => {
+      if (user?.$id) {
+        try {
+          const allowancesRes = await databaseService.getAllowances(user.$id);
+          const allowancesDocs = (allowancesRes.documents as unknown as Allowance[]);
+          
+          const uniqueBankNames = new Set<string>();
+          allowancesDocs.forEach(allowance => {
+            if (allowance.bankName) {
+              uniqueBankNames.add(allowance.bankName);
+            }
+          });
+
+          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
+            const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+            return { name, icon: bankFromFile?.icon };
+          });
+          
+          setBankSuggestions(suggestions); // Suggestions will now only contain banks from allowances
+        } catch (error) {
+          console.error("Error fetching bank suggestions:", error);
+          toast({
+            title: "Error",
+            description: "Could not load bank suggestions.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+    fetchBankSuggestionsFromAllowances();
+  }, [user]);
 
   const handleSubmit = async (expenseFormData: Partial<Expense>) => {
     setIsLoading(true);
@@ -134,7 +175,11 @@ const AddExpense = () => {
           <CardTitle>Expense Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <ExpenseForm onSubmit={handleSubmit} isLoading={isLoading} />
+          <ExpenseForm 
+            onSubmit={handleSubmit} 
+            isLoading={isLoading} 
+            bankSuggestions={bankSuggestions} // Pass the new prop
+          />
         </CardContent>
       </Card>
     </div>

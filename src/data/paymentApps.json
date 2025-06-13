@@ -1,48 +1,62 @@
-
 [
   {
     "id": "paytm",
     "name": "Paytm",
-    "icon": "smartphone"
+    "icon": "https://play-lh.googleusercontent.com/IWU8HM1uQuW8wVrp6XpyOOJXvb_1tDPUDAOfkrl83RZPG9Ww3dCY9X1AV6T1atSvgXc"
+  },
+   {
+    "id": "amazonpay",
+    "name": "Amazon Pay",
+    "icon": "https://www.shutterstock.com/image-vector/amazon-pay-logo-biggest-online-600nw-2360491029.jpg"
   },
   {
     "id": "gpay",
     "name": "Google Pay",
-    "icon": "smartphone"
+    "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSSzaBF2M98Xp1_7uBP4sVRzl7D7L_DrNrMzQ&s"
   },
   {
     "id": "phonepe",
     "name": "PhonePe",
-    "icon": "smartphone"
+    "icon": "https://i.pinimg.com/474x/81/aa/84/81aa84e607f0a0432c54fd11642b3d0d.jpg"
   },
   {
-    "id": "upi",
-    "name": "UPI",
-    "icon": "smartphone"
+    "id": "bhimupi",
+    "name": "BHIM UPI",
+    "icon": "https://images.seeklogo.com/logo-png/43/2/bhim-bharat-interface-for-money-logo-png_seeklogo-430174.png"
   },
   {
-    "id": "cash",
-    "name": "Cash",
-    "icon": "banknote"
+    "id": "whatsapppay",
+    "name": "WhatsApp Pay",
+    "icon": "https://img-cdn.tnwcdn.com/image?fit=1200%2C900&height=900&url=https%3A%2F%2Fcdn0.tnwcdn.com%2Fwp-content%2Fblogs.dir%2F1%2Ffiles%2F2018%2F01%2FWhatsApp-payments-hed-e1632716917664.jpg&signature=e43cacc22860c17d5f2bc88d2e06972b"
   },
   {
-    "id": "card",
-    "name": "Debit/Credit Card",
-    "icon": "credit-card"
+    "id": "cred",
+    "name": "CRED",
+    "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4vHywsFqMq0Vt4FY2fVGGPyNX3Cvy5K3e_w&s"
   },
   {
-    "id": "netbanking",
-    "name": "Net Banking",
-    "icon": "globe"
+    "id": "mobikwik",
+    "name": "MobiKwik",
+    "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQEt03XLHujIry51KoZxt0DLJDqQMz9k5IqUA&s"
   },
   {
-    "id": "wallet",
-    "name": "Digital Wallet",
-    "icon": "wallet"
+    "id": "freecharge",
+    "name": "Freecharge",
+    "icon": "https://i.pinimg.com/736x/fb/8d/69/fb8d69a192999b674fd5c857c218a9dd.jpg"
+  },
+  {
+    "id": "airtelpayments",
+    "name": "Airtel Payments Bank",
+    "icon": "https://images.seeklogo.com/logo-png/61/1/airtel-payments-bank-logo-png_seeklogo-615979.png"
+  },
+  {
+    "id": "jiomoney",
+    "name": "JioMoney",
+    "icon": "https://static.wikia.nocookie.net/logopedia/images/4/42/JioMoney.png/revision/latest?cb=20200808092440"
   },
   {
     "id": "other",
     "name": "Other",
-    "icon": "more-horizontal"
+    "icon": "https://images.vexels.com/media/users/3/141691/isolated/preview/a3b1c761a82f0eb10fca610a1847b61e-mobile-payment-application-smartphone.png" 
   }
 ]

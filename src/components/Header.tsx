@@ -1,18 +1,17 @@
-
-import React from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Plus, User, ArrowRight } from 'lucide-react'; // Removed Search
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+// import { Input } from '@/components/ui/input'; // Input no longer needed
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { storageService } from '@/lib/appwrite'; // Assuming storageService is used for profile image
 
 const Header = () => {
   const { user, logout } = useAuth();
@@ -25,39 +24,39 @@ const Header = () => {
     }
   };
 
-  return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-12 lg:h-14 xl:h-16 items-center justify-between px-3 lg:px-4">
-        {/* Search */}
-        <div className="flex-1 max-w-md ml-10 lg:ml-0">
-          <div className="relative">
-            <Search className="absolute left-2 lg:left-3 top-1/2 transform -translate-y-1/2 w-3 h-3 lg:w-4 lg:h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search expenses..."
-              className="pl-8 lg:pl-10 bg-muted/50 border-0 focus-visible:ring-1 text-xs lg:text-sm h-8 lg:h-9"
-            />
-          </div>
-        </div>
+  const userInitials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase()
+    : 'U';
 
-        {/* Actions */}
-        <div className="flex items-center space-x-1 lg:space-x-2">
+  return (
+    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-16 items-center justify-end px-4 sm:px-6"> {/* Changed justify-between to justify-end */}
+        {/* Search Area Removed */}
+
+        {/* Actions Area */}
+        <div className="flex items-center space-x-2 md:space-x-3">
           {/* Quick Add Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" className="gap-1 lg:gap-2 h-8 lg:h-9 px-2 lg:px-3">
-                <Plus className="w-3 h-3 lg:w-4 lg:h-4" />
-                <span className="hidden sm:inline text-xs lg:text-sm">Add</span>
+              <Button size="sm" className="h-9 gap-1.5 px-2 sm:px-3">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Add</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
-                <Link to="/add-expense">Add Expense</Link>
+                <Link to="/add-expense" className="text-sm">Add Expense</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/groups">Create Group</Link>
+                <Link to="/groups" className="text-sm">Create Group</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/goals">Add Goal</Link>
+                <Link to="/goals" className="text-sm">Set New Goal</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -65,22 +64,29 @@ const Header = () => {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Profile */}
+          {/* Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative h-8 w-8 lg:h-9 lg:w-9">
-                <Avatar className="w-6 h-6 lg:w-8 lg:h-8">
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground text-xs lg:text-sm">
-                    {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
+                <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                  {user?.prefs?.profileImageId && storageService ? (
+                     <AvatarImage src={storageService.getFilePreview(user.prefs.profileImageId).toString()} alt={user.name || 'User'} />
+                  ) : null}
+                  <AvatarFallback className="text-xs sm:text-sm bg-gradient-to-br from-primary/70 to-accent/70 text-primary-foreground">
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
-                <Link to="/profile">Profile</Link>
+                <Link to="/profile" className="text-sm">
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout}>
+              <DropdownMenuItem onClick={handleLogout} className="text-sm text-destructive focus:bg-destructive/10 focus:text-destructive">
+                <ArrowRight className="mr-2 h-4 w-4 transform rotate-180" />
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>

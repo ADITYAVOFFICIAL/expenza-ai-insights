@@ -5,193 +5,93 @@
 /* Design system optimized for Expenza - Splitwise-like experience */
 
 @layer base {
-  :root { /* Light theme variables */
-    --background: 248 250 252; /* HSL: 248, 50%, 98% (example, actual values may differ) */
-    --foreground: 15 23 42;
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 220 20% 10%;
 
-    --card: 255 255 255;
-    --card-foreground: 15 23 42;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
 
-    --popover: 255 255 255;
-    --popover-foreground: 15 23 42;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 16 185 129; /* Default primary color (e.g., a green) */
-    --primary-foreground: 255 255 255;
+    --primary: 150 60% 45%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 241 245 249;
-    --secondary-foreground: 51 65 85;
+    --secondary: 220 15% 94%;
+    --secondary-foreground: 220 15% 30%;
 
-    --muted: 241 245 249;
-    --muted-foreground: 100 116 139;
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 15% 45%;
 
-    --accent: 59 130 246; /* Default accent color (e.g., a blue) */
-    --accent-foreground: 255 255 255;
+    --accent: 210 70% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 239 68 68;
-    --destructive-foreground: 248 250 252;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 226 232 240;
-    --input: 226 232 240;
-    --ring: 16 185 129; /* Ring color, often matches primary */
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 210 70% 55%;
 
-    --success: 16 185 129;
-    --warning: 245 158 11;
-    --error: 239 68 68;
-    --info: 59 130 246;
+    --success: 130 60% 50%;
+    --warning: 40 90% 55%;
+    --error: 0 70% 55%;
+    --info: 210 70% 55%;
 
     --radius: 0.75rem;
 
-    /* Sidebar specific colors */
-    --sidebar-background: 255 255 255;
-    --sidebar-foreground: 71 85 105;
-    --sidebar-primary: 16 185 129; /* Matches default primary */
-    --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 241 245 249;
-    --sidebar-accent-foreground: 51 65 85;
-    --sidebar-border: 226 232 240;
-    --sidebar-ring: 16 185 129; /* Matches default ring/primary */
+    --sidebar-background: 220 10% 97%;
+    --sidebar-foreground: 220 10% 35%;
+    --sidebar-primary: 150 60% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 10% 92%;
+    --sidebar-accent-foreground: 220 10% 25%;
+    --sidebar-border: 220 10% 88%;
+    --sidebar-ring: 150 60% 45%;
   }
 
-  .dark { /* Dark theme variables */
-    --background: 2 8 23;
-    --foreground: 248 250 252;
+  .dark {
+    --background: 220 15% 10%;
+    --foreground: 220 15% 90%;
 
-    --card: 15 23 42;
-    --card-foreground: 248 250 252;
+    --card: 220 15% 15%;
+    --card-foreground: 220 15% 90%;
 
-    --popover: 15 23 42;
-    --popover-foreground: 248 250 252;
+    --popover: 220 15% 15%;
+    --popover-foreground: 220 15% 90%;
 
-    --primary: 16 185 129; /* Default primary for dark mode */
-    --primary-foreground: 2 8 23;
+    --primary: 150 60% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 30 41 59;
-    --secondary-foreground: 203 213 225;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 220 10% 70%;
 
-    --muted: 30 41 59;
-    --muted-foreground: 148 163 184;
+    --muted: 220 10% 25%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 59 130 246; /* Default accent for dark mode */
-    --accent-foreground: 2 8 23;
+    --accent: 210 70% 60%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 239 68 68;
-    --destructive-foreground: 248 250 252;
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 30 41 59;
-    --input: 30 41 59;
-    --ring: 16 185 129;
+    --border: 220 10% 30%;
+    --input: 220 10% 30%;
+    --ring: 210 70% 60%;
+    
+    --success: 130 60% 60%;
+    --warning: 40 90% 60%;
+    --error: 0 70% 60%;
+    --info: 210 70% 60%;
 
-    /* Sidebar specific colors for dark mode */
-    --sidebar-background: 15 23 42;
-    --sidebar-foreground: 148 163 184;
-    --sidebar-primary: 16 185 129;
-    --sidebar-primary-foreground: 2 8 23;
-    --sidebar-accent: 30 41 59;
-    --sidebar-accent-foreground: 203 213 225;
-    --sidebar-border: 30 41 59;
-    --sidebar-ring: 16 185 129;
+    --sidebar-background: 220 12% 12%;
+    --sidebar-foreground: 220 12% 70%;
+    --sidebar-primary: 150 60% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 12% 22%;
+    --sidebar-accent-foreground: 220 12% 85%;
+    --sidebar-border: 220 12% 25%;
+    --sidebar-ring: 150 60% 55%;
   }
-}
-
-@layer base {
-  * {
-    @apply border-border; /* Apply border color globally */
-  }
-
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-}
-
-@layer utilities {
-  .expense-card {
-    @apply bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02];
-  }
-  
-  .expense-amount-positive {
-    @apply text-success font-semibold;
-  }
-  
-  .expense-amount-negative {
-    @apply text-destructive font-semibold;
-  }
-  
-  .glass-effect {
-    @apply bg-card/80 backdrop-blur-lg border border-border/50 shadow-xl;
-  }
-  
-  .gradient-primary {
-    @apply bg-gradient-to-r from-primary to-accent;
-  }
-  
-  .gradient-success {
-    @apply bg-gradient-to-r from-success to-primary;
-  }
-
-  .splitwise-card {
-    @apply bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200;
-  }
-
-  .category-expense {
-    @apply text-orange-600 dark:text-orange-400;
-  }
-
-  .category-allowance {
-    @apply text-blue-600 dark:text-blue-400;
-  }
-
-  .category-savings {
-    @apply text-green-600 dark:text-green-400;
-  }
-
-  .animate-slide-up {
-    animation: slide-up 0.3s ease-out;
-  }
-
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
-  }
-}
-
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--primary));
 }

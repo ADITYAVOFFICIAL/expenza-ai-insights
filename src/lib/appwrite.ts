@@ -81,6 +81,12 @@ export const authService = {
     return account.deleteSession('current');
   },
 
+  async updatePassword(newPassword: string, oldPassword?: string) {
+    // oldPassword is required when user updates their own password
+    // It's optional if an admin is resetting a password (not applicable here)
+    return account.updatePassword(newPassword, oldPassword);
+  },
+
   async createUserProfile(userId: string, data: UserProfileCreationData) {
     const now = new Date().toISOString();
     return databases.createDocument(

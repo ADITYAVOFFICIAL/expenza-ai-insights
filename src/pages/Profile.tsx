@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Settings, CreditCard, Shield, Trash2, Upload } from 'lucide-react';
+import { User, Settings, CreditCard, Shield, Upload, KeyRound } from 'lucide-react'; // Added KeyRound
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose, // Added DialogClose
+} from '@/components/ui/dialog';
 import ThemeCustomizer from '@/components/ThemeCustomizer';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,10 +27,15 @@ const Profile = () => {
     phoneNumber: '',
     currency: 'INR',
   });
-
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [avatarUrl, setavatarUrl] = useState<string | null>(null);
+
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
 
   const loadUserProfile = useCallback(async () => {
     if (!user) return;
@@ -164,6 +177,36 @@ const Profile = () => {
       description: "This action cannot be undone. All your data will be permanently deleted. (This is a demo - no actual deletion)",
       variant: "destructive",
     });
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmNewPassword) {
+      toast({ title: "Error", description: "New passwords do not match.", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({ title: "Error", description: "New password must be at least 8 characters long.", variant: "destructive" });
+      return;
+    }
+    if (!oldPassword) {
+      toast({ title: "Error", description: "Current password is required.", variant: "destructive" });
+      return;
+    }
+
+    setPasswordUpdating(true);
+    try {
+      await authService.updatePassword(newPassword, oldPassword);
+      toast({ title: "Success", description: "Password updated successfully." });
+      setShowPasswordDialog(false);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (error: any) {
+      console.error("Password update error:", error);
+      toast({ title: "Error", description: error.message || "Failed to update password.", variant: "destructive" });
+    } finally {
+      setPasswordUpdating(false);
+    }
   };
 
   interface ThemeColors {
@@ -309,53 +352,72 @@ const Profile = () => {
                     <Label className="text-sm font-normal">Change Password</Label>
                     <p className="text-xs text-muted-foreground">Update your account password</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => toast({ title: "Feature not implemented", description: "Password change functionality is not yet available."})}>
+                  <Button variant="outline" size="sm" onClick={() => setShowPasswordDialog(true)}>
                     Change
                   </Button>
                 </div>
               </div>
             </div>
-
-            <div className="pt-4 border-t">
-              <h4 className="font-medium mb-3 flex items-center gap-2 text-red-600 text-base">
-                <Trash2 className="w-4 h-4" />
-                Danger Zone
-              </h4>
-              <div className="space-y-3">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" size="sm">
-                      Delete Account
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Delete Account</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-                      </p>
-                      <div className="space-y-2">
-                        <Label htmlFor="deleteConfirm" className="text-sm font-normal">Type "DELETE" to confirm</Label>
-                        <Input id="deleteConfirm" placeholder="DELETE" />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={() => (document.querySelector('[data-radix-dialog-default-open="true"] button[aria-label="Close"]') as HTMLElement)?.click()}>
-                          Cancel
-                        </Button>
-                        <Button variant="destructive" className="flex-1" onClick={handleDeleteAccount}>
-                          Delete Account
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
+            {/* Danger Zone Removed */}
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" /> Change Password
+            </DialogTitle>
+            <DialogDescription>
+              Enter your current password and a new password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="oldPassword">Current Password</Label>
+              <Input
+                id="oldPassword"
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder="Enter your current password"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min. 8 characters)"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+              <Input
+                id="confirmNewPassword"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={passwordUpdating}>Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleChangePassword} disabled={passwordUpdating}>
+              {passwordUpdating ? 'Updating...' : 'Update Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

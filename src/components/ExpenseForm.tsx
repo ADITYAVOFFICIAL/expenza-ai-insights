@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Upload, Scan, Trash2 } from 'lucide-react';
+import { Calendar, Upload, Scan, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import CategorySelector from './CategorySelector';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import GroupSelector from './GroupSelector';
@@ -14,7 +16,12 @@ import { Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { storageService } from '@/lib/appwrite';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
+interface BankSuggestion {
+  name: string;
+  icon?: string;
+}
 
 interface ExpenseFormProps {
   onSubmit: (expense: Partial<Expense>) => void;
@@ -22,6 +29,7 @@ interface ExpenseFormProps {
   initialData?: Partial<Expense>;
   isEditing?: boolean;
   onDelete?: (expenseId: string) => void;
+  bankSuggestions?: BankSuggestion[]; // Add new prop
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ 
@@ -29,7 +37,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   isLoading = false, 
   initialData,
   isEditing = false,
-  onDelete
+  onDelete,
+  bankSuggestions = [] // Add new prop with default
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -45,13 +54,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     splitBetween: [] as string[],
     paidBy: user?.name || 'You', // Default to current user's name or 'You'
     billImage: '', // Will store Appwrite file ID
+    currency: 'INR', // Added currency from your thoughts
   });
 
   const [showBillScanner, setShowBillScanner] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [billFileToUpload, setBillFileToUpload] = useState<File | null>(null);
   const manualBillUploadRef = useRef<HTMLInputElement>(null);
-
+  const [bankPopoverOpen, setBankPopoverOpen] = React.useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -59,7 +69,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         name: initialData.name || '',
         amount: initialData.amount?.toString() || '',
         category: initialData.category || '',
-        paymentApp: initialData.paymentApp || '',
+        // Prioritize paymentMethod from initialData, then paymentApp (for legacy), then empty
+        paymentApp: initialData.paymentMethod || (initialData as any).paymentApp || '', 
         bank: initialData.bank || '',
         date: initialData.date || new Date().toISOString().split('T')[0],
         notes: initialData.notes || '',
@@ -68,6 +79,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         splitBetween: initialData.splitBetween || [],
         paidBy: initialData.paidBy || user?.name || 'You',
         billImage: initialData.billImage || '',
+        currency: initialData.currency || 'INR',
       });
       if (initialData.billImage) {
         setBillFileToUpload(null); // Clear any staged file if initial data has an image
@@ -113,7 +125,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       splitBetween: formData.splitBetween,
       paidBy: formData.paidBy,
       isSettled: initialData?.isSettled ?? (formData.splitBetween && formData.splitBetween.length > 0 ? false : true),
-      currency: 'INR', // Consider making this dynamic based on user profile
+      currency: formData.currency, // Consider making this dynamic based on user profile
       billImage: uploadedBillFileId || undefined,
     };
     
@@ -139,6 +151,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         splitBetween: [],
         paidBy: user?.name || 'You',
         billImage: '',
+        currency: 'INR',
       });
       setBillFileToUpload(null);
       if(manualBillUploadRef.current) manualBillUploadRef.current.value = ""; // Reset file input
@@ -170,7 +183,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     });
   };
 
-  const updateFormData = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
+  const updateFormData = (field: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setDuplicateWarning(null);
   };
@@ -199,6 +212,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     setFormData(prev => ({ ...prev, billImage: '' }));
     if(manualBillUploadRef.current) manualBillUploadRef.current.value = ""; // Reset file input
   };
+
+  const selectedBankData = bankSuggestions.find(b => b.name === formData.bank);
 
   return (
     <div className="space-y-4 lg:space-y-6">
@@ -306,13 +321,64 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </div>
           <div>
             <Label htmlFor="bank" className="text-sm font-medium">Bank Account</Label>
-            <Input
-              id="bank"
-              placeholder="e.g., HDFC, SBI"
-              value={formData.bank}
-              onChange={(e) => updateFormData('bank', e.target.value)}
-              className="mt-1"
-            />
+            {/* Always show Popover, CommandInput allows typing new bank */}
+            <Popover open={bankPopoverOpen} onOpenChange={setBankPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={bankPopoverOpen}
+                  className="w-full justify-between mt-1 font-normal h-10" // Ensure consistent height
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    {selectedBankData?.icon && (
+                      <img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {formData.bank || "Select or type bank..."}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search bank or type new..."
+                    value={formData.bank} // Controlled input
+                    onValueChange={(searchValue) => updateFormData('bank', searchValue)} // Update formData as user types
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {bankSuggestions.map((suggestion) => (
+                        <CommandItem
+                          key={suggestion.name}
+                          value={suggestion.name} // This value is used for filtering and passed to onSelect
+                          onSelect={(currentValue) => { // currentValue will be suggestion.name
+                            updateFormData('bank', currentValue);
+                            setBankPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.bank === suggestion.name ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {suggestion.icon && (
+                            <img src={suggestion.icon} alt={suggestion.name} className="w-4 h-4 object-contain mr-2" />
+                          )}
+                          {suggestion.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -393,7 +459,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
             checked={formData.isRecurring}
             onCheckedChange={(checked) => updateFormData('isRecurring', checked)}
           />
-          <Label htmlFor="recurring" className="text-sm">Make this a recurring expense</Label>
+          <Label htmlFor="recurring" className="text-sm font-medium">Make this a recurring expense</Label>
         </div>
 
         <div className="flex gap-3 pt-4">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion'; // Added framer-motion
 import { 
   Home, 
   Plus, 
@@ -15,18 +16,18 @@ import {
   Calendar,
   Receipt,
   PiggyBank,
-  CreditCard // Added CreditCard for Passbook
+  CreditCard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
   { icon: Home, label: 'Dashboard', href: '/', category: 'main' },
   { icon: Plus, label: 'Add Expense', href: '/add-expense', category: 'main' },
-  { icon: CreditCard, label: 'Passbook', href: '/passbook', category: 'main' }, // Added Passbook
+  { icon: CreditCard, label: 'Passbook', href: '/passbook', category: 'main' },
   { icon: BarChart3, label: 'Analytics', href: '/analytics', category: 'insights' },
   { icon: TrendingUp, label: 'Reports', href: '/reports', category: 'insights' },
   { icon: Users, label: 'Groups', href: '/groups', category: 'social' },
-  { icon: PiggyBank, label: 'Goals', href: '/goals', category: 'planning' }, // Changed icon for Goals
+  { icon: PiggyBank, label: 'Goals', href: '/goals', category: 'planning' },
   { icon: Calendar, label: 'Recurring', href: '/recurring', category: 'planning' },
   { icon: User, label: 'Profile', href: '/profile', category: 'account' },
 ];
@@ -35,7 +36,7 @@ const categoryIcons = {
   main: Receipt,
   insights: BarChart3,
   social: Users,
-  planning: Target, // Kept Target for planning section title
+  planning: Target,
   account: User
 };
 
@@ -43,20 +44,29 @@ const Sidebar = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full bg-card">
+  // Define props for SidebarContentInternal
+  interface SidebarContentInternalProps {
+    showLogo?: boolean;
+  }
+
+  // SidebarContent remains largely the same, its internal responsive classes handle text/icon sizes
+  const SidebarContentInternal = ({ showLogo = true }: SidebarContentInternalProps) => (
+    // Removed h-full and bg-card from here as the animated panel will handle it
+    <div className="flex flex-col flex-1"> {/* Added flex-1 to allow nav to grow */}
       {/* Logo */}
-      <div className="p-4 lg:p-6 border-b border-border">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-            <Wallet className="w-4 h-4 lg:w-6 lg:h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="text-lg lg:text-xl font-bold text-foreground">Expenza</h1>
-            <p className="text-xs text-muted-foreground hidden lg:block">Smart Finance Tracker</p>
+      {showLogo && (
+        <div className="p-4 lg:p-6 border-b border-border">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+              <Wallet className="w-4 h-4 lg:w-6 lg:h-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg lg:text-xl font-bold text-foreground">Expenza</h1>
+              <p className="text-xs text-muted-foreground hidden lg:block">Smart Finance Tracker</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6 overflow-y-auto">
@@ -166,20 +176,7 @@ const Sidebar = () => {
           <User className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
           <span className="font-medium text-sm lg:text-base">Profile</span>
         </Link>
-        {/* Example: Settings link, if you have a settings page */}
-        {/* <Link
-          to="/settings"
-          onClick={() => setIsMobileOpen(false)}
-          className={cn(
-            "flex items-center space-x-3 px-3 lg:px-4 py-2 lg:py-3 rounded-xl transition-all duration-200 group",
-            location.pathname === "/settings"
-              ? "bg-muted text-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          )}
-        >
-          <Settings className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />
-          <span className="font-medium text-sm lg:text-base">Settings</span>
-        </Link> */}
+        {/* Settings link can be added here if needed */}
       </div>
     </div>
   );
@@ -189,33 +186,67 @@ const Sidebar = () => {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-card border border-border shadow-lg"
+        aria-label="Open sidebar"
+        // Refined styling for mobile trigger
+        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-md bg-card border border-border shadow-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
       >
-        <Menu className="w-5 h-5" />
+        <Menu className="w-5 h-5 text-foreground" />
       </button>
 
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 xl:w-72 border-r border-border shadow-sm">
-        <SidebarContent />
+      {/* Desktop sidebar (unchanged) */}
+      <div className="hidden lg:block fixed left-0 top-0 bottom-0 w-64 xl:w-72 border-r border-border shadow-sm bg-card">
+        <SidebarContentInternal />
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {isMobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 sm:w-72 border-r border-border shadow-lg bg-card"> {/* Added bg-card here */}
-            <div className="flex justify-end p-3">
-              <button
-                onClick={() => setIsMobileOpen(false)}
-                className="p-2 rounded-lg hover:bg-muted"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <SidebarContent />
+      {/* Mobile sidebar overlay with animations */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <div className="lg:hidden fixed inset-0 z-[60] flex" aria-modal="true"> {/* Increased z-index for overlay */}
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="absolute inset-0 bg-black/60" // Slightly darker backdrop
+              onClick={() => setIsMobileOpen(false)}
+            />
+            
+            {/* Sidebar Panel */}
+            <motion.div
+              key="sidebar-panel"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 35, duration: 0.3 }}
+              className="relative z-10 h-full w-64 sm:w-72 bg-card border-r border-border shadow-xl flex flex-col"
+            >
+              {/* Mobile Sidebar Header with Close Button */}
+              <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+                <div className="flex items-center space-x-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
+                    <Wallet className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <h1 className="text-md font-bold text-foreground">Expenza</h1>
+                </div>
+                <button
+                  onClick={() => setIsMobileOpen(false)}
+                  aria-label="Close sidebar"
+                  className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Scrollable content area for mobile sidebar */}
+              <div className="flex-1 overflow-y-auto">
+                <SidebarContentInternal showLogo={false} />
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </>
   );
 };

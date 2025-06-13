@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { FileText, Download, Calendar, Filter, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
+import { FileText, Download, Calendar, Filter, TrendingUp, DollarSign, AlertTriangle, Banknote } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,8 +31,16 @@ import {
   addYears,
   endOfDay,
 } from 'date-fns';
+import paymentAppsData from '@/data/paymentApps.json'; // Import payment apps data
+import banksData from '@/data/banks.json'; // Import bank data
 
 const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6b7280', '#ec4899', '#6366f1'];
+
+interface BankSuggestion {
+  name: string;
+  icon?: string;
+  label: string; // For display, e.g., "All Banks"
+}
 
 // Ensure your Expense type can accommodate isRecurringInstance
 // Example:
@@ -269,7 +277,7 @@ const Reports = () => {
   const paymentAppUsageData = useMemo(() => {
     const appMap: { [key: string]: { app: string; amount: number; count: number } } = {};
     filteredExpenses.forEach(expense => {
-      const appName = expense.paymentApp || 'Other/Cash'; // Ensure Expense type has paymentApp
+      const appName = expense.paymentApp || 'Other/Cash';
       if (!appMap[appName]) {
         appMap[appName] = { app: appName, amount: 0, count: 0 };
       }
@@ -299,11 +307,19 @@ const Reports = () => {
   }, [allExpenses, allRecurringExpenses]);
 
   const uniqueBanks = useMemo(() => {
-    const banks = new Set<string>();
-    allExpenses.forEach(e => { if (e.bank) banks.add(e.bank); });
-    allRecurringExpenses.forEach(re => { if (re.bank) banks.add(re.bank); });
-    return ['all', ...Array.from(banks).sort()];
+    const bankNames = new Set<string>();
+    allExpenses.forEach(e => { if (e.bank) bankNames.add(e.bank); });
+    allRecurringExpenses.forEach(re => { if (re.bank) bankNames.add(re.bank); });
+    
+    const suggestions: BankSuggestion[] = Array.from(bankNames).sort().map(name => {
+      const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+      return { name, icon: bankFromFile?.icon, label: name };
+    });
+    
+    return [{ name: 'all', label: 'All Banks', icon: undefined }, ...suggestions];
   }, [allExpenses, allRecurringExpenses]);
+
+  const selectedBankForFilter = uniqueBanks.find(b => b.name === bankFilter);
 
   if (loading) {
     return (
@@ -353,6 +369,7 @@ const Reports = () => {
                 <SelectItem value="lastMonth">Last Month</SelectItem>
                 <SelectItem value="last3Months">Last 3 Months</SelectItem>
                 <SelectItem value="thisYear">This Year</SelectItem>
+                <SelectItem value="allTime">All Time</SelectItem>
               </SelectContent>
             </Select>
 
@@ -369,11 +386,25 @@ const Reports = () => {
 
             <Select value={bankFilter} onValueChange={setBankFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Bank" />
+                <SelectValue placeholder="Bank">
+                  <div className="flex items-center gap-2">
+                    {selectedBankForFilter?.icon && (
+                      <img src={selectedBankForFilter.icon} alt={selectedBankForFilter.label} className="w-4 h-4 object-contain" />
+                    )}
+                    {selectedBankForFilter?.label || "Select Bank"}
+                  </div>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                  {uniqueBanks.map(bank => (
-                  <SelectItem key={bank} value={bank}>{bank === 'all' ? 'All Banks' : bank}</SelectItem>
+                  <SelectItem key={bank.name} value={bank.name}>
+                    <div className="flex items-center gap-2">
+                      {bank.icon && (
+                        <img src={bank.icon} alt={bank.label} className="w-4 h-4 object-contain mr-2" />
+                      )}
+                      {bank.label}
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -542,19 +573,27 @@ const Reports = () => {
           <CardContent>
             {bankWiseExpensesData.length > 0 ? (
               <div className="space-y-3">
-                {bankWiseExpensesData.map((bank, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
-                    <div>
-                      <div className="font-medium">{bank.bank}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {bank.transactions} transaction{bank.transactions === 1 ? '' : 's'}
+                {bankWiseExpensesData.map((bankItem, index) => {
+                  const bankDetails = banksData.find(b => b.name.toLowerCase() === bankItem.bank.toLowerCase());
+                  return (
+                    <div key={index} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
+                      <div className="flex items-center gap-2">
+                        {bankDetails?.icon && (
+                          <img src={bankDetails.icon} alt={bankDetails.name} className="w-5 h-5 object-contain rounded" />
+                        )}
+                        <div>
+                          <div className="font-medium">{bankItem.bank}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {bankItem.transactions} transaction{bankItem.transactions === 1 ? '' : 's'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">₹{bankItem.amount.toLocaleString()}</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold">₹{bank.amount.toLocaleString()}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : <p className="text-muted-foreground text-center py-10">No bank-wise data for selected filters.</p>}
           </CardContent>
@@ -568,13 +607,25 @@ const Reports = () => {
         <CardContent>
           {paymentAppUsageData.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paymentAppUsageData.map((app, index) => (
-                <div key={index} className="p-4 bg-muted/50 rounded-lg">
-                  <div className="font-medium">{app.app}</div>
-                  <div className="text-2xl font-bold">₹{app.amount.toLocaleString()}</div>
-                  <div className="text-sm text-muted-foreground">{app.count} transaction{app.count === 1 ? '' : 's'}</div>
-                </div>
-              ))}
+              {paymentAppUsageData.map((appUsageItem, index) => {
+                const paymentAppDetail = paymentAppsData.find(
+                  pa => pa.id.toLowerCase() === appUsageItem.app.toLowerCase() || pa.name.toLowerCase() === appUsageItem.app.toLowerCase()
+                );
+                return (
+                  <div key={index} className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      {paymentAppDetail?.icon ? (
+                        <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-6 h-6 object-contain rounded" />
+                      ) : (
+                        <Banknote className="w-5 h-5 text-muted-foreground" /> 
+                      )}
+                      <span className="font-medium">{paymentAppDetail?.name || appUsageItem.app}</span>
+                    </div>
+                    <div className="text-2xl font-bold">₹{appUsageItem.amount.toLocaleString()}</div>
+                    <div className="text-sm text-muted-foreground">{appUsageItem.count} transaction{appUsageItem.count === 1 ? '' : 's'}</div>
+                  </div>
+                );
+              })}
             </div>
           ) : <p className="text-muted-foreground text-center py-10">No payment app data for selected filters.</p>}
         </CardContent>

@@ -24,14 +24,6 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ value, on
   const apps: PaymentApp[] = Array.isArray(paymentAppsData) ? paymentAppsData : [];
   const selectedPaymentApp = apps.find(app => app.id === value);
 
-  const getIcon = (iconName: string | undefined) => {
-    if (!iconName) return LucideIcons.Smartphone;
-    const IconComponent = (LucideIcons as any)[iconName];
-    return IconComponent || LucideIcons.Smartphone;
-  };
-
-  const IconForSelected = getIcon(selectedPaymentApp?.icon);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -39,15 +31,19 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ value, on
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between text-muted-foreground hover:text-foreground"
+          className="w-full justify-between hover:text-foreground" // Removed text-muted-foreground from here
         >
           {selectedPaymentApp ? (
-            <div className="flex items-center">
-              <IconForSelected className="mr-2 h-4 w-4" />
+            <div className="flex items-center"> {/* This will now use the button's default text color */}
+              {selectedPaymentApp.icon ? (
+                <img src={selectedPaymentApp.icon} alt={selectedPaymentApp.name} className="mr-2 h-4 w-4 object-contain" />
+              ) : (
+                <Smartphone className="mr-2 h-4 w-4" /> 
+              )}
               {selectedPaymentApp.name}
             </div>
           ) : (
-            "Select payment method..."
+            <span className="text-muted-foreground">Select payment method...</span> // Apply muted color only to placeholder
           )}
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -59,7 +55,6 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ value, on
             <CommandEmpty>No payment method found.</CommandEmpty>
             <CommandGroup>
               {apps.map((app) => {
-                const IconComponent = getIcon(app.icon);
                 return (
                   <CommandItem
                     key={app.id}
@@ -69,7 +64,19 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ value, on
                       setOpen(false);
                     }}
                   >
-                    <IconComponent className={cn("mr-2 h-4 w-4", value === app.id ? "opacity-100" : "opacity-40")} />
+                    {app.icon ? (
+                      <img 
+                        src={app.icon} 
+                        alt={app.name} 
+                        // Removed conditional opacity, icons in dropdown will always be full opacity
+                        className={cn("mr-2 h-4 w-4 object-contain")} 
+                      />
+                    ) : (
+                      <Smartphone 
+                        // Removed conditional opacity
+                        className={cn("mr-2 h-4 w-4")} 
+                      />
+                    )}
                     {app.name}
                     <Check
                       className={cn(

@@ -10,7 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { Allowance, AllowanceData } from '@/lib/allowanceService';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils'; // Import cn utility
+import { cn } from '@/lib/utils';
+import banksData from '@/data/banks.json'; // Import the banks data
+
+interface BankOption {
+  id: string;
+  name: string;
+  icon: string; 
+}
 
 interface AllowanceManagerProps {
   allowances: Allowance[];
@@ -27,8 +34,6 @@ const initialAllowanceState: AllowanceData = {
   isActive: true,
 };
 
-const bankOptions = ['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'Other'];
-
 const AllowanceManager: React.FC<AllowanceManagerProps> = ({
   allowances,
   onAdd,
@@ -40,22 +45,28 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
   const [currentAllowance, setCurrentAllowance] = useState<AllowanceData>(initialAllowanceState);
   const [currentAllowanceId, setCurrentAllowanceId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [amountInput, setAmountInput] = useState<string>(''); // Added state for amount input string
+
+  const selectedBank = banksData.find(bank => bank.name === currentAllowance.bankName);
 
   const handleOpenDialog = (allowance?: Allowance) => {
     if (allowance) {
       setIsEditing(true);
       setCurrentAllowanceId(allowance.$id);
-      setCurrentAllowance({
+      const allowanceData = {
         bankName: allowance.bankName,
         amount: allowance.amount,
         frequency: allowance.frequency,
         nextReceived: allowance.nextReceived ? format(parseISO(allowance.nextReceived), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
         isActive: allowance.isActive,
-      });
+      };
+      setCurrentAllowance(allowanceData);
+      setAmountInput(allowance.amount.toString()); // Initialize amountInput
     } else {
       setIsEditing(false);
       setCurrentAllowanceId(null);
       setCurrentAllowance(initialAllowanceState);
+      setAmountInput(initialAllowanceState.amount.toString()); // Initialize amountInput (e.g., "0")
     }
     setShowDialog(true);
   };
@@ -66,10 +77,12 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
         setIsEditing(false);
         setCurrentAllowanceId(null);
         setCurrentAllowance(initialAllowanceState);
+        setAmountInput(initialAllowanceState.amount.toString()); // Reset on close
     }, 300);
   }
 
   const handleSubmit = async () => {
+    // currentAllowance.amount is kept in sync by the Input's onChange
     if (currentAllowance.amount <= 0) {
         toast({ title: "Invalid Amount", description: "Amount must be greater than zero.", variant: "destructive"});
         return;
@@ -88,6 +101,7 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
       handleDialogClose();
     } catch (error) {
       console.error("Failed to save allowance", error);
+      // Assuming toast for error is handled by onEdit/onAdd or a generic error handler
     } finally {
       setProcessing(false);
     }
@@ -135,45 +149,52 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
           </div>
         ) : (
           <div className="space-y-3 max-h-72 overflow-y-auto">
-            {allowances.map((allowance) => (
-              <Card key={allowance.$id} className="p-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-sm">{allowance.bankName}</h4>
-                      <Badge className={cn("text-xs", getFrequencyColor(allowance.frequency))}>
-                        {allowance.frequency.charAt(0).toUpperCase() + allowance.frequency.slice(1)}
+            {allowances.map((allowance) => {
+              const bankDetails = banksData.find(b => b.name === allowance.bankName); // This line looks up the bank
+              return (
+                <Card key={allowance.$id} className="p-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {/* This part renders the logo if bankDetails and its icon are found */}
+                        {bankDetails && bankDetails.icon && (
+                          <img src={bankDetails.icon} alt={bankDetails.name} className="w-4 h-4 object-contain" />
+                        )}
+                        <h4 className="font-medium text-sm">{allowance.bankName}</h4>
+                        <Badge className={cn("text-xs", getFrequencyColor(allowance.frequency))}>
+                          {allowance.frequency.charAt(0).toUpperCase() + allowance.frequency.slice(1)}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Amount: <span className="font-medium text-foreground">₹{allowance.amount.toLocaleString()}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Next: <span className="font-medium text-foreground">{format(parseISO(allowance.nextReceived), 'MMM dd, yyyy')}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                       <Badge variant={allowance.isActive ? "default" : "secondary"} className={cn("text-xs mb-1", allowance.isActive ? "bg-success text-success-foreground" : "")}>
+                          {allowance.isActive ? 'Active' : 'Inactive'}
                       </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Amount: <span className="font-medium text-foreground">₹{allowance.amount.toLocaleString()}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Next: <span className="font-medium text-foreground">{format(parseISO(allowance.nextReceived), 'MMM dd, yyyy')}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                     <Badge variant={allowance.isActive ? "default" : "secondary"} className={cn("text-xs mb-1", allowance.isActive ? "bg-success text-success-foreground" : "")}>
-                        {allowance.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                    <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(allowance)} disabled={processing}>
-                            <Edit className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-7 w-7 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                            onClick={() => handleDelete(allowance.$id)}
-                            disabled={processing}
-                        >
-                            <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                      <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenDialog(allowance)} disabled={processing}>
+                              <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                              onClick={() => handleDelete(allowance.$id)}
+                              disabled={processing}
+                          >
+                              <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -191,11 +212,23 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
                 onValueChange={(value) => setCurrentAllowance({ ...currentAllowance, bankName: value })}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select Bank" />
+                  <SelectValue placeholder="Select Bank">
+                    {selectedBank ? (
+                      <div className="flex items-center gap-2">
+                        <img src={selectedBank.icon} alt={selectedBank.name} className="w-4 h-4 object-contain" /> {/* Changed from selectedBank.logo */}
+                        {selectedBank.name}
+                      </div>
+                    ) : "Select Bank"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {bankOptions.map((bank) => (
-                    <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                  {banksData.map((bank: BankOption) => (
+                    <SelectItem key={bank.id} value={bank.name}>
+                      <div className="flex items-center gap-2">
+                        <img src={bank.icon} alt={bank.name} className="w-4 h-4 object-contain mr-2" /> {/* Changed from bank.logo */}
+                        {bank.name}
+                      </div>
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -205,8 +238,14 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
               <Input
                 id="amount"
                 type="number"
-                value={currentAllowance.amount}
-                onChange={(e) => setCurrentAllowance({ ...currentAllowance, amount: parseFloat(e.target.value) || 0 })}
+                value={amountInput} // Use string state for value
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setAmountInput(val); // Update string input state
+                  const numVal = parseFloat(val);
+                  // Update numeric amount in currentAllowance, defaulting to 0 if input is empty or invalid
+                  setCurrentAllowance(prev => ({ ...prev, amount: isNaN(numVal) ? 0 : numVal }));
+                }}
                 placeholder="5000"
                 className="col-span-3"
               />

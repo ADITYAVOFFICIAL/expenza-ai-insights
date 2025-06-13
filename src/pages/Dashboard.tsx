@@ -16,6 +16,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, COLLECTIONS } from '@/lib/appwrite';
 import { toast } from '@/hooks/use-toast';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, isSameMonth, isBefore } from 'date-fns'; // Added isSameMonth, isBefore
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import ExpenseForm from '@/components/ExpenseForm';
+import { Allowance } from '@/lib/allowanceService';
+import banksData from '@/data/banks.json';
+import { GenericDocData } from '@/lib/appwrite';
 
 const quickActions = [
   { icon: Plus, label: 'Add Expense', subtitle: 'Log a new transaction', href: '/add-expense' },
@@ -23,6 +33,11 @@ const quickActions = [
   { icon: Users, label: 'Manage Groups', subtitle: 'Split bills with friends', href: '/groups' },
   { icon: Target, label: 'Set Goals', subtitle: 'Save for your dreams', href: '/goals' },
 ];
+
+interface BankSuggestion {
+  name: string;
+  icon?: string;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -38,6 +53,11 @@ const Dashboard = () => {
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
   const [topCategoriesThisMonth, setTopCategoriesThisMonth] = useState<Array<{ name: string; amount: number; percentage: number; displayColor: string }>>([]);
   const [activityFeedItems, setActivityFeedItems] = useState<ActivityItem[]>([]);
+
+  const [showEditExpenseDialog, setShowEditExpenseDialog] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [bankSuggestionsForEdit, setBankSuggestionsForEdit] = useState<BankSuggestion[]>([]);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const categoryColors: { [key: string]: string } = {
     food: '#FF6384',
@@ -169,14 +189,87 @@ const Dashboard = () => {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const fetchBankSuggestions = async () => {
+      if (showEditExpenseDialog && user?.$id) {
+        try {
+          const allowancesRes = await databaseService.getAllowances(user.$id);
+          const allowancesDocs = (allowancesRes.documents as unknown as Allowance[]);
+          const uniqueBankNames = new Set<string>();
+          allowancesDocs.forEach(allowance => {
+            if (allowance.bankName) uniqueBankNames.add(allowance.bankName);
+          });
+          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
+            const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+            return { name, icon: bankFromFile?.icon };
+          });
+          banksData.forEach(bankFileEntry => {
+            if (!suggestions.some(s => s.name.toLowerCase() === bankFileEntry.name.toLowerCase())) {
+              suggestions.push({ name: bankFileEntry.name, icon: bankFileEntry.icon });
+            }
+          });
+          suggestions.sort((a, b) => a.name.localeCompare(b.name));
+          setBankSuggestionsForEdit(suggestions);
+        } catch (error) {
+          console.error("Error fetching bank suggestions for edit:", error);
+          toast({ title: "Error", description: "Could not load bank suggestions for editing.", variant: "destructive" });
+        }
+      }
+    };
+    fetchBankSuggestions();
+  }, [showEditExpenseDialog, user]);
+
   const handleEditExpense = (expense: Expense) => {
-    // Prevent editing of auto-generated recurring expense instances from dashboard
     if (expense.$id?.startsWith('recurring-')) {
-        toast({ title: "Info", description: "Edit recurring expenses from the 'Recurring' page.", variant: "default" });
-        navigate('/recurring');
-        return;
+      toast({ title: "Info", description: "Edit recurring expenses from the 'Recurring' page.", variant: "default" });
+      navigate('/recurring');
+      return;
     }
-    navigate(`/add-expense?id=${expense.$id}`, { state: { expenseData: expense } });
+    // The ExpenseForm expects initialData.paymentApp for the PaymentMethodSelector
+    // Ensure the expense object passed to initialData has paymentApp if paymentMethod exists
+    const expenseToEdit = {
+      ...expense,
+      paymentApp: expense.paymentMethod || (expense as any).paymentApp
+    };
+    setEditingExpense(expenseToEdit);
+    setShowEditExpenseDialog(true);
+  };
+
+  const handleUpdateSubmittedExpense = async (expenseFormData: Partial<Expense>) => {
+    if (!editingExpense?.$id || !user?.$id) {
+      toast({ title: "Error", description: "Cannot update expense. Missing ID or user information.", variant: "destructive" });
+      return;
+    }
+    setIsSubmittingEdit(true);
+    try {
+      const dataToUpdate: GenericDocData = {
+        name: expenseFormData.name!,
+        amount: expenseFormData.amount!,
+        date: expenseFormData.date!,
+        category: expenseFormData.category!,
+        currency: expenseFormData.currency || 'INR',
+        notes: expenseFormData.notes || undefined,
+        paymentMethod: (expenseFormData as any).paymentApp || undefined, // form sends paymentApp, save as paymentMethod
+        bank: expenseFormData.bank || undefined,
+        billImage: expenseFormData.billImage || undefined,
+        isRecurring: expenseFormData.isRecurring || false,
+        groupId: expenseFormData.groupId || undefined,
+        paidBy: expenseFormData.paidBy || undefined,
+        splitBetween: expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 ? expenseFormData.splitBetween : undefined,
+        isSettled: expenseFormData.isSettled,
+      };
+
+      await databaseService.updateExpense(editingExpense.$id, dataToUpdate);
+      toast({ title: "Expense Updated", description: "Your expense has been successfully updated." });
+      setShowEditExpenseDialog(false);
+      setEditingExpense(null);
+      fetchData(); 
+    } catch (error: any) {
+      console.error('Error updating expense:', error);
+      toast({ title: "Error Updating Expense", description: error.message || "Failed to update expense. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSubmittingEdit(false);
+    }
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
@@ -257,7 +350,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+    <div className="space-y-6 p-4 lg:p-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -300,7 +393,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-foreground">Recent Expenses</h2>
             <Link 
-              to="/analytics" // Or a dedicated expenses page
+              to="/analytics"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
               View All
@@ -369,6 +462,29 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
+
+      {/* AI Insights Dialog, if any */}
+      {/* ... existing JSX ... */}
+
+      {editingExpense && (
+        <Dialog open={showEditExpenseDialog} onOpenChange={(isOpen) => {
+          setShowEditExpenseDialog(isOpen);
+          if (!isOpen) setEditingExpense(null);
+        }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Expense</DialogTitle>
+            </DialogHeader>
+            <ExpenseForm
+              onSubmit={handleUpdateSubmittedExpense}
+              isLoading={isSubmittingEdit}
+              initialData={editingExpense}
+              isEditing={true}
+              bankSuggestions={bankSuggestionsForEdit}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

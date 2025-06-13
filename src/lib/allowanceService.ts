@@ -2,23 +2,33 @@ import { databaseService, COLLECTIONS } from './appwrite';
 import { ID, Query } from 'appwrite';
 
 export interface Allowance {
-  id: string;
+  $id: string; // Changed from id to $id
   bankName: string;
   amount: number;
   frequency: 'weekly' | 'monthly' | 'yearly';
   nextReceived: string;
   isActive: boolean;
   userId: string;
-  createdAt: string;
-  updatedAt?: string; // Added for consistency if Appwrite auto-updates this
+  createdAt: string; // This is your custom createdAt field
+  updatedAt?: string; // This is your custom updatedAt field
 }
 
+export interface AllowanceData { // Assuming AllowanceData is for creation/update and might not need $id
+  bankName: string;
+  amount: number;
+  frequency: 'weekly' | 'monthly' | 'yearly';
+  nextReceived: string;
+  isActive: boolean;
+  // userId is typically added by the service/backend
+}
+
+
 export const allowanceService = {
-  async createAllowance(data: Omit<Allowance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Allowance> {
+  async createAllowance(data: Omit<Allowance, '$id' | 'createdAt' | 'updatedAt' | 'userId'> & { userId: string }): Promise<Allowance> { // Changed 'id' to '$id' in Omit, ensure userId is part of input for creation if not handled by higher level service
     const document = await databaseService.createDocument(
       COLLECTIONS.ALLOWANCES,
       {
-        ...data,
+        ...data, // userId should be in data here
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -32,13 +42,13 @@ export const allowanceService = {
       COLLECTIONS.ALLOWANCES,
       [
         Query.equal('userId', userId),
-        Query.orderDesc('createdAt')
+        Query.orderDesc('createdAt') // Using your custom 'createdAt'
       ]
     );
     return response.documents as unknown as Allowance[];
   },
 
-  async updateAllowance(allowanceId: string, data: Partial<Omit<Allowance, 'id' | 'createdAt' | 'userId'>>): Promise<Allowance> {
+  async updateAllowance(allowanceId: string, data: Partial<Omit<Allowance, '$id' | 'createdAt' | 'userId' | 'updatedAt'>>): Promise<Allowance> { // Changed 'id' to '$id' in Omit
     const document = await databaseService.updateDocument(
       COLLECTIONS.ALLOWANCES,
       allowanceId,
