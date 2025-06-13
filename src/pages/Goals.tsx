@@ -357,7 +357,7 @@ const Goals = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-sm text-muted-foreground">Days Left</div>
-                      <div className="font-semibold flex items-center gap-1"><Calendar className="w-4 h-4" />{daysLeft}</div>
+                      <div className="font-semibold flex items-center gap-1 "><Calendar className="w-4 h-4 dark:text-foreground" />{daysLeft}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Monthly Target</div>
@@ -400,9 +400,9 @@ const Goals = () => {
       <Dialog open={showGoalDialog} onOpenChange={setShowGoalDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditingGoal ? 'Edit' : 'Create New'} Goal</DialogTitle>
+            <DialogTitle className="text-foreground dark:text-foreground">{isEditingGoal ? 'Edit' : 'Create New'} Goal</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 dark:text-foreground">
             <div><Label htmlFor="name">Goal Name</Label><Input id="name" name="name" value={goalFormData.name} onChange={handleInputChange} placeholder="e.g., Emergency Fund" /></div>
             <div><Label htmlFor="targetAmountStr">Target Amount (₹)</Label><Input id="targetAmountStr" name="targetAmountStr" type="number" value={goalFormData.targetAmountStr} onChange={handleInputChange} placeholder="100000" /></div>
             <div><Label htmlFor="currentAmountStr">Current Amount (₹)</Label><Input id="currentAmountStr" name="currentAmountStr" type="number" value={goalFormData.currentAmountStr} onChange={handleInputChange} disabled={!isEditingGoal} /></div>
@@ -420,7 +420,7 @@ const Goals = () => {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline" disabled={processing}>Cancel</Button></DialogClose>
+            <DialogClose asChild><Button type="button" variant="outline" disabled={processing} className="dark:text-foreground">Cancel</Button></DialogClose>
             <Button type="submit" onClick={handleSubmitGoal} disabled={processing}>{processing ? (isEditingGoal ? 'Saving...' : 'Creating...') : (isEditingGoal ? 'Save Changes' : 'Create Goal')}</Button>
           </DialogFooter>
         </DialogContent>
