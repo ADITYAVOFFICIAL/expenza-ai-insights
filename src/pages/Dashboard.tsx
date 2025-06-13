@@ -10,23 +10,13 @@ import AllowanceManager from '@/components/AllowanceManager';
 import { Expense, RecurringExpense } from '@/types/expense'; // Added RecurringExpense
 import { Allowance, AllowanceData } from '@/lib/allowanceService'; // Ensure AllowanceData is exported or defined
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { databaseService, COLLECTIONS } from '@/lib/appwrite';
+import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
+import { useAuth } from '@/contexts/AuthContext'; // Added this import
+import { databaseService } from '@/lib/appwrite';
 import { toast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, isSameMonth, isBefore } from 'date-fns'; // Added isSameMonth, isBefore
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import ExpenseForm from '@/components/ExpenseForm';
-import { Allowance } from '@/lib/allowanceService';
-import banksData from '@/data/banks.json';
-import { GenericDocData } from '@/lib/appwrite';
-
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils'; // Added this import
+import categoriesData from '@/data/categories.json'; // Import categories data
 const quickActions = [
   { icon: Plus, label: 'Add Expense', subtitle: 'Log a new transaction', href: '/add-expense' },
   { icon: BarChart3, label: 'View Analytics', subtitle: 'Track your spending', href: '/analytics' },
@@ -38,6 +28,20 @@ interface BankSuggestion {
   name: string;
   icon?: string;
 }
+
+// Helper to get category icon component (similar to ExpenseCard)
+const getCategoryIcon = (categoryId: string | undefined) => {
+  const defaultIcon = LucideIcons.Tag; // Default icon if not found
+
+  if (!categoryId) {
+    return defaultIcon;
+  }
+  const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase() || cat.name.toLowerCase() === categoryId.toLowerCase());
+  if (!category || !category.icon) {
+    return defaultIcon;
+  }
+  return (LucideIcons as any)[category.icon] || defaultIcon;
+};
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -51,7 +55,7 @@ const Dashboard = () => {
 
   const [quickStatsData, setQuickStatsData] = useState<QuickStatProps[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
-  const [topCategoriesThisMonth, setTopCategoriesThisMonth] = useState<Array<{ name: string; amount: number; percentage: number; displayColor: string }>>([]);
+  const [topCategoriesThisMonth, setTopCategoriesThisMonth] = useState<Array<{ name: string; amount: number; percentage: number; displayColor: string; id: string }>>([]);
   const [activityFeedItems, setActivityFeedItems] = useState<ActivityItem[]>([]);
 
   const [showEditExpenseDialog, setShowEditExpenseDialog] = useState(false);
@@ -168,12 +172,16 @@ const Dashboard = () => {
       const sortedCategories = Object.entries(categorySpending)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 5) // Top 5
-        .map(([name, amount]) => ({
-          name,
-          amount,
-          percentage: totalCategorySpending > 0 ? parseFloat(((amount / totalCategorySpending) * 100).toFixed(1)) : 0,
-          displayColor: categoryColors[name.toLowerCase()] || generateRandomColor(),
-        }));
+        .map(([name, amount]) => {
+          const categoryDetails = categoriesData.find(c => c.name.toLowerCase() === name.toLowerCase());
+          return {
+            id: categoryDetails?.id || name.toLowerCase(), // Ensure you have an ID
+            name,
+            amount,
+            percentage: totalCategorySpending > 0 ? parseFloat(((amount / totalCategorySpending) * 100).toFixed(1)) : 0,
+            displayColor: categoryDetails?.color || generateRandomColor(), // Use color from categories.json
+          };
+        });
       setTopCategoriesThisMonth(sortedCategories);
 
     } catch (err) {
@@ -273,20 +281,22 @@ const Dashboard = () => {
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
-    // Prevent deleting of auto-generated recurring expense instances from dashboard
     if (expenseId?.startsWith('recurring-')) {
         toast({ title: "Info", description: "Delete recurring expenses from the 'Recurring' page.", variant: "default" });
         navigate('/recurring');
         return;
     }
     if (!user?.$id) return;
-    try {
-      await databaseService.deleteExpense(expenseId);
-      toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
-      fetchData(); // Refresh data
-    } catch (error) {
-      console.error("Error deleting expense:", error);
-      toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
+
+    if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
+      try {
+        await databaseService.deleteExpense(expenseId);
+        toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
+        fetchData(); // Refresh data
+      } catch (error) {
+        console.error("Error deleting expense:", error);
+        toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
+      }
     }
   };
 
@@ -394,7 +404,7 @@ const Dashboard = () => {
             <h2 className="text-xl font-semibold text-foreground">Recent Expenses</h2>
             <Link 
               to="/analytics"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "dark:text-foreground")} // Added dark:text-foreground
             >
               View All
             </Link>
@@ -441,37 +451,38 @@ const Dashboard = () => {
               <CardTitle className="text-xl">Top Categories This Month</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {topCategoriesThisMonth.length > 0 ? topCategoriesThisMonth.map((category) => (
-                <div key={category.name}>
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="flex items-center gap-2">
-                       <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: category.displayColor }}
-                       />
-                      <span className="text-sm font-medium text-foreground">{category.name}</span>
+              {topCategoriesThisMonth.length > 0 ? topCategoriesThisMonth.map((category) => {
+                const CategoryIcon = getCategoryIcon(category.id); // Use category.id
+                return (
+                  <div key={category.name}>
+                    <div className="flex justify-between items-center mb-1">
+                      <div className="flex items-center gap-2">
+                        <CategoryIcon 
+                            className="w-4 h-4"
+                            style={{ color: category.displayColor }}
+                        />
+                        <span className="text-sm font-medium text-foreground">{category.name}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">₹{category.amount.toLocaleString()}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">₹{category.amount.toLocaleString()}</span>
+                    <Progress value={category.percentage} className="h-2" indicatorClassName="bg-primary" style={{ backgroundColor: `${category.displayColor}4D` /* Use color with opacity */, '--progress-indicator-color': category.displayColor } as React.CSSProperties} />
                   </div>
-                  <Progress value={category.percentage} className="h-2" indicatorClassName="bg-primary" style={{ '--tw-bg-opacity': '1', backgroundColor: category.displayColor }} />
-                </div>
-              )) : (
+                );
+              }) : (
                 <p className="text-muted-foreground text-center py-4">No category spending data for this month yet.</p>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* AI Insights Dialog, if any */}
-      {/* ... existing JSX ... */}
+      {/* ... rest of dashboard ... */}
 
       {editingExpense && (
         <Dialog open={showEditExpenseDialog} onOpenChange={(isOpen) => {
           setShowEditExpenseDialog(isOpen);
           if (!isOpen) setEditingExpense(null);
         }}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-3xl"> {/* Changed lg:max-w-2xl to lg:max-w-3xl */}
             <DialogHeader>
               <DialogTitle>Edit Expense</DialogTitle>
             </DialogHeader>

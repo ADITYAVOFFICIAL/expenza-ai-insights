@@ -1,14 +1,16 @@
 import React from 'react';
 import { format, parseISO } from 'date-fns';
-import { Edit, Trash2, ShoppingCart, Utensils, Car, Home, Briefcase, HeartPulse, MoreHorizontal, Banknote, Landmark, Smartphone,CreditCard } from 'lucide-react';
+import { Edit, Trash2, Landmark, CreditCard, Repeat, Briefcase } from 'lucide-react'; // Keep common fallbacks
+import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Expense } from '@/types/expense';
 import { cn } from '@/lib/utils';
 import paymentAppsData from '@/data/paymentApps.json';
 import banksData from '@/data/banks.json';
+import categoriesData from '@/data/categories.json'; // Import categories data
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -16,28 +18,29 @@ interface ExpenseCardProps {
   onDelete: (expenseId: string) => void;
 }
 
-const categoryIcons: { [key: string]: React.ElementType } = {
-  food: Utensils,
-  shopping: ShoppingCart,
-  transport: Car,
-  utilities: Home,
-  entertainment: MoreHorizontal, 
-  health: HeartPulse,
-  salary: Banknote, // Assuming income might be shown as negative expense or similar
-  allowance: Banknote,
-  investment: Landmark,
-  education: Briefcase, // Example, adjust as needed
-  personal: Briefcase,  // Example
-  loan: Landmark,       // Example
-  subscription: CreditCard, // Example
-  other: MoreHorizontal,
+// Helper to get category details (icon component and color)
+const getCategoryDetails = (categoryId: string | undefined) => {
+  const defaultIcon = LucideIcons.Briefcase;
+  const defaultColor = 'hsl(var(--muted-foreground))'; // A generic color
+
+  if (!categoryId) {
+    return { IconComponent: defaultIcon, color: defaultColor, name: 'Other' };
+  }
+
+  const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase());
+  if (!category) {
+    return { IconComponent: defaultIcon, color: defaultColor, name: categoryId };
+  }
+
+  const IconComponent = (LucideIcons as any)[category.icon] || defaultIcon;
+  return { IconComponent, color: category.color || defaultColor, name: category.name };
 };
 
 
 const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) => {
-  const CategoryIcon = categoryIcons[expense.category?.toLowerCase()] || Briefcase;
+  const { IconComponent: CategoryIcon, color: categoryColor } = getCategoryDetails(expense.category);
   
-  const paymentIdentifier = expense.paymentMethod || (expense as any).paymentApp; // Fallback for older data
+  const paymentIdentifier = expense.paymentMethod || (expense as any).paymentApp;
   const paymentAppDetail = paymentIdentifier ? paymentAppsData.find(app => 
     app.id.toLowerCase() === paymentIdentifier.toLowerCase() || 
     app.name.toLowerCase() === paymentIdentifier.toLowerCase()
@@ -57,15 +60,9 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
     if (expense.$id) {
       onDelete(expense.$id);
     } else {
-      // Handle cases where $id might be missing for virtual recurring instances if needed
-      // For now, we assume onDelete expects a valid ID for actual deletable expenses
       console.warn("Attempted to delete an expense without an ID.", expense);
     }
   };
-
-  const categorySafelistKey = expense.category?.toLowerCase() || 'other';
-  // Ensure these dynamic classes are picked up by Tailwind JIT or safelisted
-  // e.g., bg-food-100, text-food-600, dark:bg-food-900/30, dark:text-food-400 etc. for all categories
 
   return (
     <Card className="hover:shadow-lg transition-shadow duration-200 group bg-card text-card-foreground">
@@ -73,23 +70,31 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
         <div className="flex items-start justify-between gap-2">
           {/* Left Section: Icon, Name, Date */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink min-w-0">
-            <div className={cn(
-                "w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0",
-                `bg-${categorySafelistKey}-100 dark:bg-${categorySafelistKey}-900/30`,
-                !categoryIcons[categorySafelistKey] && "bg-muted dark:bg-muted/30"
-            )}>
-              <CategoryIcon className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5",
-                  `text-${categorySafelistKey}-600 dark:text-${categorySafelistKey}-400`,
-                  !categoryIcons[categorySafelistKey] && "text-muted-foreground"
-              )} />
+            <div 
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: `${categoryColor}1A` }} // Use category color with low opacity for background
+            >
+              <CategoryIcon 
+                className="w-4 h-4 sm:w-5 sm:h-5" 
+                style={{ color: categoryColor }} // Use category color for icon
+              />
             </div>
             <div className="flex-grow min-w-0">
               <h4 className="font-semibold text-sm sm:text-base text-foreground truncate" title={expense.name}>
                 {expense.name}
               </h4>
-              <p className="text-xs sm:text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground flex items-center">
                 {expense.date ? format(parseISO(expense.date), 'MMM dd, yyyy') : 'N/A'}
+                {(expense.isRecurring || expense.isRecurringInstance) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Repeat className="w-3.5 h-3.5 ml-1.5 text-primary" /> 
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Recurring Expense</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </p>
             </div>
           </div>
@@ -99,10 +104,8 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
             <div className={`text-base sm:text-lg font-bold ${expense.amount >= 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
               ₹{Math.abs(expense.amount).toLocaleString()}
             </div>
-
-            {/* Payment Details Container */}
+            
             <div className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
-              {/* Payment Method Display */}
               {paymentIdentifier && (
                 <div className="flex items-center justify-end gap-1" title={paymentAppDetail?.name || paymentIdentifier}>
                   {paymentAppDetail?.icon ? (
@@ -113,8 +116,6 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
                   <span className="truncate max-w-[80px] sm:max-w-[100px]">{paymentAppDetail?.name || paymentIdentifier}</span>
                 </div>
               )}
-
-              {/* Bank Display */}
               {expense.bank && (
                 <div className="flex items-center justify-end gap-1" title={expense.bank}>
                   {bankDetail?.icon ? (
@@ -127,7 +128,6 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
               )}
             </div>
             
-            {/* Split Info Badge */}
             {expense.splitBetween && expense.splitBetween.length > 1 && (
               <Badge 
                 variant={expense.isSettled ? "default" : "outline"} 
@@ -140,8 +140,7 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
               </Badge>
             )}
 
-            {/* Action Buttons - Appear on Hover */}
-            {(onEdit || onDelete) && !expense.isRecurringInstance && ( // Do not show edit/delete for virtual recurring instances
+            {(onEdit || onDelete) && !expense.isRecurringInstance && (
               <div className="flex gap-1 mt-1 sm:mt-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
                 {onEdit && (
                   <Tooltip>
@@ -156,7 +155,7 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
                 {onDelete && (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive/90 hover:bg-destructive/10" onClick={handleDelete}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:h-7 text-destructive hover:text-destructive/90 hover:bg-destructive/10" onClick={handleDelete}>
                         <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       </Button>
                     </TooltipTrigger>

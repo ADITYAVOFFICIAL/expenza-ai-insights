@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import ExpenseForm from '@/components/ExpenseForm';
 import { Expense } from '@/types/expense';
+import { RecurringExpense } from '@/types/expense'; // Import RecurringExpense type
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, GenericDocData } from '@/lib/appwrite';
 import { Allowance } from '@/lib/allowanceService';
@@ -68,43 +69,60 @@ const AddExpense = () => {
     }
 
     try {
-      // Construct the data payload for Appwrite
-      // Ensure all required fields from your Appwrite collection are present
-      // and optional fields are handled correctly (either present with value or omitted)
       const expenseDataToSave: GenericDocData = {
         userId: user.$id,
-        name: expenseFormData.name!, // Assuming name is always present
-        amount: expenseFormData.amount!, // Assuming amount is always present
-        date: expenseFormData.date!,   // Assuming date is always present
-        category: expenseFormData.category!, // Assuming category is always present
-        currency: expenseFormData.currency || 'INR', // Default or from form
-
-        // Optional fields: only include them if they have a value
+        name: expenseFormData.name!,
+        amount: expenseFormData.amount!,
+        date: expenseFormData.date!,
+        category: expenseFormData.category!,
+        currency: expenseFormData.currency || 'INR',
         ...(expenseFormData.notes && { notes: expenseFormData.notes }),
-        ...(expenseFormData.paymentApp && { paymentApp: expenseFormData.paymentApp }),
+        ...(expenseFormData.paymentApp && { paymentMethod: expenseFormData.paymentApp }), // paymentApp from form is paymentMethod in DB
         ...(expenseFormData.bank && { bank: expenseFormData.bank }),
         ...(expenseFormData.billImage && { billImage: expenseFormData.billImage }),
-        isRecurring: expenseFormData.isRecurring || false,
+        isRecurring: expenseFormData.isRecurring || false, // This flag remains on the individual expense
         ...(expenseFormData.groupId && { groupId: expenseFormData.groupId }),
         ...(expenseFormData.paidBy && { paidBy: expenseFormData.paidBy }),
         ...(expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 && { splitBetween: expenseFormData.splitBetween }),
         isSettled: expenseFormData.isSettled || false,
       };
       
-      // Appwrite's createDocument in databaseService will add $id, createdAt, updatedAt
+      // 1. Create the individual expense instance
       await databaseService.createExpense(expenseDataToSave);
+      
+      // 2. If marked as recurring, also create a recurring expense template
+      if (expenseFormData.isRecurring) {
+        const recurringDataToSave: Omit<RecurringExpense, '$id' | '$createdAt' | '$updatedAt' | 'lastPaidDate'> = {
+          userId: user.$id,
+          name: expenseFormData.name!,
+          amount: expenseFormData.amount!,
+          category: expenseFormData.category!,
+          frequency: 'monthly', // Defaulting to 'monthly'
+          nextDueDate: expenseFormData.date!, // Use the expense date as the first due date
+          isActive: true,
+          bank: expenseFormData.bank || undefined,
+          paymentMethod: expenseFormData.paymentApp || undefined, // Use paymentApp from form for paymentMethod
+          notes: expenseFormData.notes || `Recurring template created from expense on ${expenseFormData.date}. Default frequency: monthly.`,
+        };
+        await databaseService.createRecurringExpense(recurringDataToSave);
+        toast({
+          title: "Recurring Template Created",
+          description: `A monthly recurring template for "${expenseFormData.name}" has been created. You can edit its frequency and other details on the 'Recurring Expenses' page.`,
+          duration: 8000, // Longer duration for this specific toast
+        });
+      }
       
       toast({
         title: "Expense Added",
         description: "Your expense has been successfully recorded.",
       });
       
-      navigate('/'); // Navigate to dashboard or expenses list after successful submission
+      navigate('/'); 
     } catch (error: any) {
-      console.error('Error saving expense:', error);
+      console.error('Error saving expense and/or recurring template:', error);
       toast({
-        title: "Error Adding Expense",
-        description: error.message || "Failed to add expense. Please try again.",
+        title: "Error Processing Expense",
+        description: error.message || "Failed to process expense. Please try again.",
         variant: "destructive",
       });
     } finally {

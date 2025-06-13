@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
@@ -34,6 +33,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
             backgroundColor: 'hsl(var(--background))',
             border: '1px solid hsl(var(--border))',
             borderRadius: '8px',
+            color: 'hsl(var(--accent))',
           }}
         />
         <Legend 

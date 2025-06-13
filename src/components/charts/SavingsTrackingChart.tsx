@@ -117,6 +117,7 @@ const SavingsTrackingChart: React.FC<SavingsTrackingChartProps> = ({ weeklyData,
                     backgroundColor: 'hsl(var(--background))',
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px',
+                    color: 'hsl(var(--foreground))',
                 }}
                 />
                 <Legend />

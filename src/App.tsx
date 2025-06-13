@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "./components/Layout";
@@ -16,10 +15,11 @@ import Recurring from "./pages/Recurring";
 import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
-import LandingPage from "./pages/LandingPage";
+import LandingPage from "./components/LandingPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import PassBook from "./pages/Passbook";
+import { Wallet } from "lucide-react"; // Import the Wallet icon
 
 const queryClient = new QueryClient();
 
@@ -28,12 +28,27 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg mx-auto mb-4">
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <div className="relative flex items-center justify-center mb-6">
+            {/* Pulsing background circles */}
+            <div className="absolute w-20 h-20 bg-primary/10 rounded-full animate-ping opacity-75"></div>
+            <div
+              className="absolute w-28 h-28 bg-primary/5 rounded-full animate-ping opacity-50"
+              style={{ animationDelay: "0.3s" }}
+            ></div>
+
+            {/* Expenza Icon */}
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl">
+              <Wallet className="w-8 h-8 text-primary-foreground" />
+            </div>
           </div>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-lg font-medium text-foreground animate-pulse">
+            Loading Expenza...
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Please wait a moment.
+          </p>
         </div>
       </div>
     );

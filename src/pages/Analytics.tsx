@@ -461,7 +461,7 @@ const Analytics = () => {
         </div>
         <div className="flex gap-2">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 dark:text-foreground"> {/* Added dark:text-foreground */}
               <SelectValue placeholder="Time period" />
             </SelectTrigger>
             <SelectContent>
@@ -471,7 +471,13 @@ const Analytics = () => {
               <SelectItem value="thisYear">This Year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)} disabled={!analyticsExportData}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowExportDialog(true)} 
+            disabled={!analyticsExportData}
+            className="dark:text-foreground" /* Added dark:text-foreground */
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
@@ -560,7 +566,12 @@ const Analytics = () => {
                   <Tooltip
                     formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)]}
                     labelStyle={{color: 'hsl(var(--foreground))'}}
-                    contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
+                    contentStyle={{
+                    backgroundColor: 'hsl(var(--background))', 
+                    border: '1px solid hsl(var(--border))', 
+                    borderRadius: 'var(--radius)',
+                    color: 'hsl(var(--foreground))',
+                }}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="income" stroke="#3b82f6" name="Income" />

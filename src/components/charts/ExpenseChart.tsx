@@ -34,6 +34,7 @@ const ExpenseChart = () => {
             backgroundColor: 'hsl(var(--background))',
             border: '1px solid hsl(var(--border))',
             borderRadius: '8px',
+            color: 'hsl(var(--foreground))',
           }}
         />
         <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

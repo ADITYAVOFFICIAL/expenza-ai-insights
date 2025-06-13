@@ -396,30 +396,30 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 dark:text-foreground"> {/* Added dark:text-foreground */}
             <Download className="w-5 h-5" />
             Export Analytics Data
           </DialogTitle>
         </DialogHeader>
         <div className="py-4 space-y-6">
           <div>
-            <Label className="text-sm font-medium">Export Format</Label>
+            <Label className="text-sm font-medium dark:text-foreground">Export Format</Label> {/* Added dark:text-foreground */}
             <Select value={exportFormat} onValueChange={(value: 'csv' | 'pdf' | 'xlsx') => setExportFormat(value)} disabled={isExporting}>
-              <SelectTrigger>
+              <SelectTrigger className="dark:text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="csv">CSV (Comma Separated Values)</SelectItem>
-                <SelectItem value="pdf">PDF Document</SelectItem>
-                <SelectItem value="xlsx">Excel Spreadsheet (.xlsx)</SelectItem>
+                <SelectItem value="csv" className="dark:text-foreground">CSV (Comma Separated Values)</SelectItem> {/* Added dark:text-foreground */}
+                <SelectItem value="pdf" className="dark:text-foreground">PDF Document</SelectItem> {/* Added dark:text-foreground */}
+                <SelectItem value="xlsx" className="dark:text-foreground">Excel Spreadsheet (.xlsx)</SelectItem> {/* Added dark:text-foreground */}
               </SelectContent>
             </Select>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-medium">Select Data Sets to Include</Label>
-                <Button variant="link" size="sm" onClick={() => handleSelectAllDataSets(!allDataSetsSelected)} className="p-0 h-auto" disabled={isExporting}>
+                <Label className="text-sm font-medium dark:text-foreground">Select Data Sets to Include</Label> {/* Added dark:text-foreground */}
+                <Button variant="link" size="sm" onClick={() => handleSelectAllDataSets(!allDataSetsSelected)} className="p-0 h-auto dark:text-primary" disabled={isExporting}> {/* Added dark:text-primary */}
                     {allDataSetsSelected ? <Square className="w-4 h-4 mr-1"/> : <CheckSquare className="w-4 h-4 mr-1"/>}
                     {allDataSetsSelected ? 'Deselect All' : 'Select All'}
                 </Button>
@@ -433,7 +433,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
                     onCheckedChange={(checked) => handleDataSetChange(option.id, !!checked)}
                     disabled={isExporting}
                   />
-                  <Label htmlFor={`cb-export-${option.id}`} className="font-normal cursor-pointer flex-1">
+                  <Label htmlFor={`cb-export-${option.id}`} className="font-normal cursor-pointer flex-1 dark:text-foreground"> {/* Added dark:text-foreground */}
                     {option.label}
                   </Label>
                 </div>
@@ -449,7 +449,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
                 onCheckedChange={(checked) => setIncludeGraphs(!!checked)}
                 disabled={isExporting}
               />
-              <Label htmlFor="cb-include-graphs" className="font-normal cursor-pointer">
+              <Label htmlFor="cb-include-graphs" className="font-normal cursor-pointer dark:text-foreground"> {/* Added dark:text-foreground */}
                 Include Charts/Graphs (Beta)
               </Label>
             </div>
@@ -460,7 +460,9 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({ open, onO
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button type="button" variant="outline" disabled={isExporting}>Cancel</Button>
+            <Button type="button" variant="outline" disabled={isExporting} className="dark:text-foreground">
+              Cancel
+            </Button>
           </DialogClose>
           <Button type="button" onClick={handleExport} disabled={isExporting || (!analyticsData || (selectedDataSets.length === 0 && !includeGraphs))}>
             {isExporting ? (

@@ -503,7 +503,15 @@ const Reports = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]} />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]} 
+                    contentStyle={{
+                        backgroundColor: 'hsl(var(--background))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 'var(--radius)',
+                        color: 'hsl(var(--foreground))',
+                    }}
+                  />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
@@ -525,7 +533,12 @@ const Reports = () => {
                   <Tooltip
                     formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
                     labelStyle={{color: 'hsl(var(--foreground))'}}
-                    contentStyle={{backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
+                    contentStyle={{
+                        backgroundColor: 'hsl(var(--background))', 
+                        border: '1px solid hsl(var(--border))', 
+                        borderRadius: 'var(--radius)',
+                        color: 'hsl(var(--foreground))',
+                    }}
                   />
                   <Legend />
                   <Line type="monotone" dataKey="amount" name="Expenses" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: 'hsl(var(--primary))', r:3 }} activeDot={{r:5}}/>

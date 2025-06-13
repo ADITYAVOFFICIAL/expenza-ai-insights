@@ -200,11 +200,11 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
       </CardContent>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-[425px]" onInteractOutside={(e) => { if (processing) e.preventDefault(); }}>
+        <DialogContent className="sm:max-w-[425px] text-foreground" onInteractOutside={(e) => { if (processing) e.preventDefault(); }}>
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit' : 'Add New'} Allowance</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 text-foreground"> {/* Added text-foreground */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="bankName" className="text-right">Bank</Label>
               <Select

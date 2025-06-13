@@ -63,6 +63,14 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   const manualBillUploadRef = useRef<HTMLInputElement>(null);
   const [bankPopoverOpen, setBankPopoverOpen] = React.useState(false);
 
+  const internalHandleDelete = () => {
+    if (onDelete && initialData?.$id) {
+      if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
+        onDelete(initialData.$id);
+      }
+    }
+  };
+
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -190,7 +198,9 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   const handleDelete = () => {
     if (onDelete && initialData?.$id) {
-      onDelete(initialData.$id);
+      if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
+        onDelete(initialData.$id);
+      }
     }
   };
 
@@ -225,7 +235,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               type="button"
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={internalHandleDelete} // Changed to internalHandleDelete
               className="flex items-center gap-2"
             >
               <Trash2 className="w-4 h-4" />
@@ -257,7 +267,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Expense Name and Amount */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
           <div>
             <Label htmlFor="name" className="text-sm font-medium">Expense Name *</Label>
             <Input
@@ -284,7 +295,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Category and Payment Method */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
           <div>
             <Label className="text-sm font-medium">Category *</Label>
             <div className="mt-1">
@@ -305,7 +317,8 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Date and Bank Account */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
           <div>
             <Label htmlFor="date" className="text-sm font-medium">Date *</Label>
             <div className="relative mt-1">

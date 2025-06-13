@@ -1,5 +1,8 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
+import { AlertTriangle, Home } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const NotFound = () => {
   const location = useLocation();
@@ -12,14 +15,29 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4">
+            <AlertTriangle className="w-16 h-16 text-destructive" />
+          </div>
+          <CardTitle className="text-3xl font-bold text-destructive">404 - Page Not Found</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center space-y-4">
+          <p className="text-lg text-foreground">
+            Oops! The page you're looking for doesn't exist.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            You tried to access: <code className="px-1 py-0.5 bg-muted rounded text-foreground font-mono">{location.pathname}</code>
+          </p>
+          <Button asChild size="lg" className="mt-6">
+            <Link to="/">
+              <Home className="w-4 h-4 mr-2" />
+              Return to Dashboard
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 };

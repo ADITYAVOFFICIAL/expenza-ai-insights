@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BookOpenText, AlertTriangle, Repeat, Search, Filter as FilterIcon, XCircle } from 'lucide-react';
+import { BookOpenText, AlertTriangle, Repeat, Search, Filter as FilterIcon, XCircle, PlusCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService } from '@/lib/appwrite';
@@ -37,6 +37,7 @@ import {
 import ExpenseForm from '@/components/ExpenseForm';
 import { Allowance } from '@/lib/allowanceService';
 import banksData from '@/data/banks.json';
+import paymentAppsData from '@/data/paymentApps.json'; // Import payment apps data
 import { GenericDocData } from '@/lib/appwrite';
 
 interface GroupedTransaction {
@@ -56,8 +57,15 @@ const DATE_RANGE_OPTIONS = [
 
 const ALL_CATEGORIES_VALUE = "__ALL_CATEGORIES__";
 const ALL_BANKS_VALUE = "__ALL_BANKS__";
+const ALL_PAYMENT_METHODS_VALUE = "__ALL_PAYMENT_METHODS__"; // New constant
 
 interface BankSuggestion {
+  name: string;
+  icon?: string;
+}
+
+interface PaymentMethodSuggestion { // New interface for payment method suggestions
+  id: string;
   name: string;
   icon?: string;
 }
@@ -75,10 +83,12 @@ const Passbook = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState(''); // Empty string means no filter / show placeholder
   const [filterBank, setFilterBank] = useState(''); // Empty string means no filter / show placeholder
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState(''); // New state for payment method filter
   const [filterDateRange, setFilterDateRange] = useState('all');
-
+  
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
-  const [uniqueBanks, setUniqueBanks] = useState<string[]>([]);
+  const [uniqueBanks, setUniqueBanks] = useState<BankSuggestion[]>([]); 
+  const [uniquePaymentMethods, setUniquePaymentMethods] = useState<PaymentMethodSuggestion[]>([]); // New state for payment method suggestions
 
   const [showEditTransactionDialog, setShowEditTransactionDialog] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Expense | null>(null);
@@ -98,7 +108,6 @@ const Passbook = () => {
       setIsLoading(false);
       return;
     }
-
     setIsLoading(true);
     setError(null);
 
@@ -142,13 +151,37 @@ const Passbook = () => {
       const combinedTransactions = [...fetchedExpenses, ...virtualRecurringExpenses];
 
       const categories = new Set<string>();
-      const banks = new Set<string>();
+      const bankNamesSet = new Set<string>();
+      const paymentMethodIdsSet = new Set<string>(); // Set for unique payment method IDs/names
+
       combinedTransactions.forEach(tx => {
         if (tx.category) categories.add(tx.category);
-        if (tx.bank) banks.add(tx.bank);
+        if (tx.bank) bankNamesSet.add(tx.bank);
+        // Use paymentMethod first, fallback to paymentApp for legacy data
+        const paymentId = tx.paymentMethod || (tx as any).paymentApp;
+        if (paymentId) paymentMethodIdsSet.add(paymentId);
       });
       setUniqueCategories(Array.from(categories).sort());
-      setUniqueBanks(Array.from(banks).sort());
+      
+      const bankSuggestionsList: BankSuggestion[] = Array.from(bankNamesSet)
+        .sort()
+        .map(name => {
+          const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+          return { name, icon: bankFromFile?.icon };
+        });
+      setUniqueBanks(bankSuggestionsList);
+
+      // Populate uniquePaymentMethods
+      const paymentMethodSuggestionsList: PaymentMethodSuggestion[] = Array.from(paymentMethodIdsSet)
+        .map(idOrName => {
+          const appDetail = paymentAppsData.find(app => 
+            app.id.toLowerCase() === idOrName.toLowerCase() || 
+            app.name.toLowerCase() === idOrName.toLowerCase()
+          );
+          return appDetail ? { id: appDetail.id, name: appDetail.name, icon: appDetail.icon } : { id: idOrName, name: idOrName, icon: undefined };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setUniquePaymentMethods(paymentMethodSuggestionsList);
 
       setAllFetchedTransactions(combinedTransactions);
 
@@ -176,16 +209,25 @@ const Passbook = () => {
         tx.name.toLowerCase().includes(lowerSearchTerm) ||
         (tx.notes && tx.notes.toLowerCase().includes(lowerSearchTerm)) ||
         tx.category.toLowerCase().includes(lowerSearchTerm) ||
-        (tx.bank && tx.bank.toLowerCase().includes(lowerSearchTerm))
+        (tx.bank && tx.bank.toLowerCase().includes(lowerSearchTerm)) ||
+        (tx.paymentMethod && tx.paymentMethod.toLowerCase().includes(lowerSearchTerm)) || // Search in payment method
+        ((tx as any).paymentApp && (tx as any).paymentApp.toLowerCase().includes(lowerSearchTerm)) // Search in legacy paymentApp
       );
     }
 
-    if (filterCategory) { // filterCategory will be '' if "All Categories" is selected
+    if (filterCategory) {
       filtered = filtered.filter(tx => tx.category === filterCategory);
     }
 
-    if (filterBank) { // filterBank will be '' if "All Banks" is selected
+    if (filterBank) {
       filtered = filtered.filter(tx => tx.bank === filterBank);
+    }
+
+    if (filterPaymentMethod) { // Apply payment method filter
+      filtered = filtered.filter(tx => {
+        const paymentId = tx.paymentMethod || (tx as any).paymentApp;
+        return paymentId === filterPaymentMethod;
+      });
     }
 
     if (filterDateRange !== 'all') {
@@ -262,7 +304,7 @@ const Passbook = () => {
 
     setDisplayTransactions(groups);
 
-  }, [allFetchedTransactions, searchTerm, filterCategory, filterBank, filterDateRange, getRelativeDateLabel, isLoading]);
+  }, [allFetchedTransactions, searchTerm, filterCategory, filterBank, filterPaymentMethod, filterDateRange, getRelativeDateLabel, isLoading]); // Added filterPaymentMethod to dependencies
 
 
   const handleEditTransaction = (transaction: Expense) => {
@@ -325,13 +367,15 @@ const Passbook = () => {
     }
     if (!user?.$id) return;
 
-    try {
-      await databaseService.deleteExpense(transactionId);
-      toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
-      fetchData();
-    } catch (error) {
-      console.error("Error deleting expense:", error);
-      toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
+    if (window.confirm("Are you sure you want to delete this transaction? This action cannot be undone.")) {
+      try {
+        await databaseService.deleteExpense(transactionId);
+        toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
+        fetchData();
+      } catch (error) {
+        console.error("Error deleting expense:", error);
+        toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
+      }
     }
   };
 
@@ -339,6 +383,7 @@ const Passbook = () => {
     setSearchTerm('');
     setFilterCategory('');
     setFilterBank('');
+    setFilterPaymentMethod(''); // Clear payment method filter
     setFilterDateRange('all');
   };
 
@@ -393,7 +438,10 @@ const Passbook = () => {
     );
   }
 
-  const hasActiveFilters = searchTerm || filterCategory || filterBank || filterDateRange !== 'all';
+  const hasActiveFilters = searchTerm || filterCategory || filterBank || filterPaymentMethod || filterDateRange !== 'all'; // Added filterPaymentMethod
+
+  const selectedBankForFilter = uniqueBanks.find(b => b.name === filterBank);
+  const selectedPaymentMethodForFilter = uniquePaymentMethods.find(pm => pm.id === filterPaymentMethod); // Find selected payment method
 
   return (
     <div className="space-y-6 p-4 lg:p-8">
@@ -421,13 +469,13 @@ const Passbook = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, notes, category, bank..."
+              placeholder="Search by name, notes, category, bank, payment method..." // Updated placeholder
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"> {/* Adjusted grid to lg:grid-cols-4 */}
             <Select value={filterDateRange} onValueChange={setFilterDateRange}>
               <SelectTrigger><SelectValue placeholder="Select Date Range" /></SelectTrigger>
               <SelectContent>
@@ -437,7 +485,7 @@ const Passbook = () => {
               </SelectContent>
             </Select>
             <Select
-              value={filterCategory || ALL_CATEGORIES_VALUE} // Show placeholder if filterCategory is ''
+              value={filterCategory || ALL_CATEGORIES_VALUE}
               onValueChange={(value) => setFilterCategory(value === ALL_CATEGORIES_VALUE ? '' : value)}
             >
               <SelectTrigger><SelectValue placeholder="Select Category" /></SelectTrigger>
@@ -449,14 +497,59 @@ const Passbook = () => {
               </SelectContent>
             </Select>
             <Select
-              value={filterBank || ALL_BANKS_VALUE} // Show placeholder if filterBank is ''
+              value={filterBank || ALL_BANKS_VALUE}
               onValueChange={(value) => setFilterBank(value === ALL_BANKS_VALUE ? '' : value)}
             >
-              <SelectTrigger><SelectValue placeholder="Select Bank" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Bank">
+                  <div className="flex items-center gap-2">
+                    {selectedBankForFilter?.icon && (
+                      <img src={selectedBankForFilter.icon} alt={selectedBankForFilter.name} className="w-4 h-4 object-contain" />
+                    )}
+                    {selectedBankForFilter?.name || "Select Bank"}
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_BANKS_VALUE}>All Banks</SelectItem>
                 {uniqueBanks.map(bank => (
-                  <SelectItem key={bank} value={bank}>{bank}</SelectItem>
+                  <SelectItem key={bank.name} value={bank.name}>
+                    <div className="flex items-center gap-2">
+                      {bank.icon && (
+                        <img src={bank.icon} alt={bank.name} className="w-4 h-4 object-contain mr-2" />
+                      )}
+                      {bank.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* New Payment Method Filter */}
+            <Select
+              value={filterPaymentMethod || ALL_PAYMENT_METHODS_VALUE}
+              onValueChange={(value) => setFilterPaymentMethod(value === ALL_PAYMENT_METHODS_VALUE ? '' : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select Payment Method">
+                  <div className="flex items-center gap-2">
+                    {selectedPaymentMethodForFilter?.icon && (
+                      <img src={selectedPaymentMethodForFilter.icon} alt={selectedPaymentMethodForFilter.name} className="w-4 h-4 object-contain rounded" />
+                    )}
+                    {selectedPaymentMethodForFilter?.name || "Select Payment Method"}
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_PAYMENT_METHODS_VALUE}>All Payment Methods</SelectItem>
+                {uniquePaymentMethods.map(pm => (
+                  <SelectItem key={pm.id} value={pm.id}>
+                    <div className="flex items-center gap-2">
+                      {pm.icon && (
+                        <img src={pm.icon} alt={pm.name} className="w-4 h-4 object-contain mr-2 rounded" />
+                      )}
+                      {pm.name}
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -477,23 +570,35 @@ const Passbook = () => {
         </div>
       )}
 
-      {!isLoading && displayTransactions.length === 0 ? (
-        <Card>
-          <CardContent className="p-10 text-center text-muted-foreground">
-            <BookOpenText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            {hasActiveFilters ? "No transactions match your current filters." : "No transactions found."}
-            <br />
+      {displayTransactions.length === 0 && !isLoading ? (
+        <Card className="mt-4">
+          <CardContent className="flex flex-col items-center justify-center p-6 sm:p-10 text-center min-h-[250px]">
+            <BookOpenText className="w-16 h-16 mb-4 text-muted-foreground opacity-50" />
+            <p className="text-lg font-semibold text-foreground mb-2">
+              {hasActiveFilters ? "No Transactions Match Filters" : "No Transactions Found"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+              {hasActiveFilters 
+                ? "Try adjusting your search terms or filters to find what you're looking for." 
+                : "It looks like you haven't added any expenses yet. Get started by recording a transaction or setting up your recurring payments."}
+            </p>
             {hasActiveFilters ? (
-                <Button variant="link" className="p-0 h-auto" onClick={clearFilters}>
-                    Clear filters to see all transactions
+                <Button variant="outline" onClick={clearFilters}>
+                    <FilterX className="w-4 h-4 mr-2" /> Clear Filters
                 </Button>
             ) : (
-                <>
-                <Button variant="link" className="p-0 h-auto" asChild>
-                    <Link to="/add-expense">Add your first expense</Link>
-                </Button>
-                or check your recurring schedule.
-                </>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button asChild size="lg">
+                        <Link to="/add-expense">
+                            <PlusCircle className="w-4 h-4 mr-2" /> Add New Expense
+                        </Link>
+                    </Button>
+                    <Button variant="outline" asChild size="lg">
+                        <Link to="/recurring">
+                            <Repeat className="w-4 h-4 mr-2" /> Manage Recurring
+                        </Link>
+                    </Button>
+                </div>
             )}
           </CardContent>
         </Card>
@@ -522,7 +627,7 @@ const Passbook = () => {
           setShowEditTransactionDialog(isOpen);
           if (!isOpen) setEditingTransaction(null);
         }}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-md lg:max-w-3xl"> {/* Changed lg:max-w-2xl to lg:max-w-3xl */}
             <DialogHeader>
               <DialogTitle>Edit Transaction</DialogTitle>
             </DialogHeader>

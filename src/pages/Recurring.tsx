@@ -3,6 +3,8 @@ import { Calendar, Plus, Edit, Trash2, Pause, Play, AlertTriangle } from 'lucide
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
+import categoriesData from '@/data/categories.json'; // Import categories data
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { databaseService } from '@/lib/appwrite';
 import { RecurringExpense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
-import { format, differenceInDays, parseISO, isValid } from 'date-fns';
+import { format, differenceInDays, parseISO, isValid, startOfWeek, endOfWeek, startOfToday } from 'date-fns'; // Added startOfWeek, endOfWeek, startOfToday
 import banksData from '@/data/banks.json'; // Import bank data
 import paymentAppsData from '@/data/paymentApps.json'; // Import payment app data
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'; // Import Popover
@@ -20,6 +22,22 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown } from 'lucide-react'; // Import Check and ChevronsUpDown
 import { cn } from '@/lib/utils'; // Import cn utility
 import { Allowance } from '@/lib/allowanceService'; // Import Allowance type
+
+// Helper to get category details (icon component and color) - can be shared or redefined
+const getCategoryDetails = (categoryId: string | undefined) => {
+  const defaultIcon = LucideIcons.Briefcase;
+  const defaultColor = 'hsl(var(--muted-foreground))';
+
+  if (!categoryId) {
+    return { IconComponent: defaultIcon, color: defaultColor, name: 'Other' };
+  }
+  const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase());
+  if (!category) {
+    return { IconComponent: defaultIcon, color: defaultColor, name: categoryId };
+  }
+  const IconComponent = (LucideIcons as any)[category.icon] || defaultIcon;
+  return { IconComponent, color: category.color || defaultColor, name: category.name };
+};
 
 interface RecurringFormState {
   name: string;
@@ -263,9 +281,22 @@ const Recurring = () => {
   const totalMonthlyAmount = activeExpenses
     .filter(r => r.frequency === 'monthly')
     .reduce((acc, r) => acc + r.amount, 0);
+
+  const today = startOfToday();
+  const endOfCurrentCalendarWeek = endOfWeek(today, { weekStartsOn: 1 }); // Assuming week starts on Monday
+
   const dueThisWeek = activeExpenses.filter(r => {
-    const { days } = getDaysUntilDue(r.nextDueDate);
-    return days >= 0 && days <= 7;
+    if (!r.nextDueDate) return false;
+    try {
+      const dueDate = parseISO(r.nextDueDate);
+      // Ensure the date is valid
+      if (!isValid(dueDate)) return false;
+      
+      // Check if the due date is on or after today AND on or before the end of the current calendar week.
+      return dueDate >= today && dueDate <= endOfCurrentCalendarWeek;
+    } catch {
+      return false; // Catch errors from parseISO if nextDueDate is malformed
+    }
   });
 
   if (isLoading) {
@@ -293,23 +324,39 @@ const Recurring = () => {
     formType: 'create' | 'edit'
   ) => {
     const selectedBankData = bankSuggestions.find(b => b.name === formState.bank);
-    const selectedPaymentMethodData = paymentAppsData.find(p => p.id === formState.paymentMethod || p.name === formState.paymentMethod);
+    const selectedPaymentMethodData = formState.paymentMethod
+      ? paymentAppsData.find(p => p.id === formState.paymentMethod)
+      : undefined;
 
     return (
-      <div className="space-y-4 py-4">
+      // Apply text-foreground to this wrapper to help with color inheritance in dark mode
+      <div className="space-y-4 py-4 text-foreground">
         <div>
           <Label htmlFor={`${formType}-recurringName`}>Expense Name *</Label>
-          <Input id={`${formType}-recurringName`} value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} placeholder="e.g., Netflix Subscription" />
+          <Input 
+            id={`${formType}-recurringName`} 
+            value={formState.name} 
+            onChange={(e) => setFormState({ ...formState, name: e.target.value })} 
+            placeholder="e.g., Netflix Subscription" 
+          />
         </div>
         <div>
           <Label htmlFor={`${formType}-recurringAmount`}>Amount (₹) *</Label>
-          <Input id={`${formType}-recurringAmount`} type="number" value={formState.amount} onChange={(e) => setFormState({ ...formState, amount: e.target.value })} placeholder="599" />
+          <Input 
+            id={`${formType}-recurringAmount`} 
+            type="number" 
+            value={formState.amount} 
+            onChange={(e) => setFormState({ ...formState, amount: e.target.value })} 
+            placeholder="599" 
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor={`${formType}-recurringCategory`}>Category</Label>
             <Select value={formState.category} onValueChange={(value) => setFormState({ ...formState, category: value })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="utilities">Utilities</SelectItem>
                 <SelectItem value="entertainment">Entertainment</SelectItem>
@@ -325,8 +372,10 @@ const Recurring = () => {
           </div>
           <div>
             <Label htmlFor={`${formType}-recurringFrequency`}>Frequency</Label>
-            <Select value={formState.frequency} onValueChange={(value: any) => setFormState({ ...formState, frequency: value })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select value={formState.frequency} onValueChange={(value: 'daily' | 'weekly' | 'monthly' | 'yearly') => setFormState({ ...formState, frequency: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select frequency" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem>
                 <SelectItem value="weekly">Weekly</SelectItem>
@@ -338,7 +387,12 @@ const Recurring = () => {
         </div>
         <div>
           <Label htmlFor={`${formType}-recurringNextDue`}>Next Due Date *</Label>
-          <Input id={`${formType}-recurringNextDue`} type="date" value={formState.nextDueDate} onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} />
+          <Input 
+            id={`${formType}-recurringNextDue`} 
+            type="date" 
+            value={formState.nextDueDate} 
+            onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} 
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -416,7 +470,7 @@ const Recurring = () => {
                       <img src={selectedPaymentMethodData.icon} alt={selectedPaymentMethodData.name} className="w-4 h-4 object-contain flex-shrink-0 rounded" />
                     )}
                     <span className="truncate">
-                      {selectedPaymentMethodData?.name || formState.paymentMethod || "Select payment method..."}
+                      {selectedPaymentMethodData?.name || "Select payment method..."}
                     </span>
                   </div>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -431,9 +485,9 @@ const Recurring = () => {
                       {paymentAppsData.map((app) => (
                         <CommandItem
                           key={app.id}
-                          value={app.name} // Use name for display and search
+                          value={app.name} 
                           onSelect={() => {
-                            setFormState({ ...formState, paymentMethod: app.id }); // Store ID
+                            setFormState({ ...formState, paymentMethod: app.id }); 
                             setPaymentMethodPopoverOpen(false);
                           }}
                         >
@@ -458,7 +512,12 @@ const Recurring = () => {
         </div>
           <div>
           <Label htmlFor={`${formType}-recurringNotes`}>Notes (Optional)</Label>
-          <Input id={`${formType}-recurringNotes`} value={formState.notes} onChange={(e) => setFormState({ ...formState, notes: e.target.value })} placeholder="Additional details" />
+          <Input 
+            id={`${formType}-recurringNotes`} 
+            value={formState.notes} 
+            onChange={(e) => setFormState({ ...formState, notes: e.target.value })} 
+            placeholder="Additional details" 
+          />
         </div>
       </div>
     );
@@ -489,7 +548,7 @@ const Recurring = () => {
               Add Recurring
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="text-foreground"> {/* Added text-foreground */}
             <DialogHeader>
               <DialogTitle>Add New Recurring Expense</DialogTitle>
             </DialogHeader>
@@ -581,6 +640,7 @@ const Recurring = () => {
           const dueDateInfo = getDaysUntilDue(expense.nextDueDate);
           const bankDetails = expense.bank ? banksData.find(b => b.name.toLowerCase() === expense.bank!.toLowerCase()) : undefined;
           const paymentAppDetail = expense.paymentMethod ? paymentAppsData.find(p => p.id.toLowerCase() === expense.paymentMethod!.toLowerCase() || p.name.toLowerCase() === expense.paymentMethod!.toLowerCase()) : undefined;
+          const { IconComponent: CategoryIcon, color: categoryColor, name: categoryName } = getCategoryDetails(expense.category);
 
           return (
             <Card key={expense.$id} className={!expense.isActive ? 'opacity-60' : ''}>
@@ -642,7 +702,15 @@ const Recurring = () => {
                       )}
                     </div>
                   )}
-                  {expense.category && <div><div className="text-sm text-muted-foreground">Category</div><Badge variant="outline" className="capitalize">{expense.category}</Badge></div>}
+                  {expense.category && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Category</div>
+                      <Badge variant="outline" className="capitalize flex items-center gap-1.5" style={{ borderColor: categoryColor, color: categoryColor }}>
+                        <CategoryIcon className="w-3 h-3" /> 
+                        {categoryName}
+                      </Badge>
+                    </div>
+                  )}
                   {expense.notes && <div><div className="text-sm text-muted-foreground">Notes</div><p className="text-sm">{expense.notes}</p></div>}
                   {expense.lastPaidDate && <div><div className="text-sm text-muted-foreground">Last Paid</div><div className="text-sm">{format(parseISO(expense.lastPaidDate), 'MMM dd, yyyy')}</div></div>}
                   
@@ -675,7 +743,7 @@ const Recurring = () => {
             }
           }}
         >
-            <DialogContent>
+            <DialogContent className="text-foreground"> {/* Added text-foreground */}
                 <DialogHeader>
                   <DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle>
                 </DialogHeader>
