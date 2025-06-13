@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,22 +7,32 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
-import AddExpense from "./pages/AddExpense";
-import Analytics from "./pages/Analytics";
-import Groups from "./pages/Groups";
-import Goals from "./pages/Goals";
-import Recurring from "./pages/Recurring";
-import Reports from "./pages/Reports";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
-import LandingPage from "./components/LandingPage";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import PassBook from "./pages/Passbook";
 import { Wallet } from "lucide-react"; // Import the Wallet icon
 
 const queryClient = new QueryClient();
+
+// Lazy load page components
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const AddExpense = React.lazy(() => import("./pages/AddExpense"));
+const Analytics = React.lazy(() => import("./pages/Analytics"));
+const Groups = React.lazy(() => import("./pages/Groups"));
+const Goals = React.lazy(() => import("./pages/Goals"));
+const Recurring = React.lazy(() => import("./pages/Recurring"));
+const Reports = React.lazy(() => import("./pages/Reports"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const PassBook = React.lazy(() => import("./pages/Passbook"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const Login = React.lazy(() => import("./pages/Login"));
+const Signup = React.lazy(() => import("./pages/Signup"));
+const LandingPage = React.lazy(() => import("./components/LandingPage")); // Or src/pages/LandingPage.tsx if that's the one used for routing
+
+// A simple loader component for Suspense fallback
+const PageLoader = () => (
+  <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+    <p className="mt-2 text-muted-foreground">Loading...</p>
+  </div>
+);
 
 const AppContent = () => {
   const { user, loading } = useAuth();
@@ -57,51 +68,53 @@ const AppContent = () => {
   if (!user) {
     return (
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="*" element={<LandingPage />} />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="*" element={<LandingPage />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     );
   }
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="add-expense" element={<AddExpense />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="groups" element={<Groups />} />
-          <Route path="goals" element={<Goals />} />
-          <Route path="recurring" element={<Recurring />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="passbook" element={<PassBook />} />
-          <Route path="profile" element={<Profile />} />
-        </Route>
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="add-expense" element={<AddExpense />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="groups" element={<Groups />} />
+            <Route path="goals" element={<Goals />} />
+            <Route path="recurring" element={<Recurring />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="passbook" element={<PassBook />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };
 
-const App = () => {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider> {/* Moved AuthProvider to wrap ThemeProvider */}
-        <ThemeProvider defaultTheme="system" storageKey="digisamaharta-ui-theme">
+      <AuthProvider>
+        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
           <TooltipProvider>
-            <div className="min-h-screen w-full">
-              <Toaster />
-              <Sonner />
-              <AppContent />
-            </div>
+            <AppContent />
+            <Toaster />
+            <Sonner />
           </TooltipProvider>
         </ThemeProvider>
-      </AuthProvider> {/* AuthProvider ends */}
+      </AuthProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

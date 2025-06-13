@@ -118,7 +118,7 @@ const LandingPage = () => {
 
           <motion.div variants={fadeInUp} className="mt-16">
             <img 
-              src="/placeholder.svg" // Replace with an actual product screenshot or illustration
+              src="https://media.tenor.com/dWr1cf7RN_gAAAAM/money-wwf.gif" // Replace with an actual product screenshot or illustration
               alt="DigiSamahārta Dashboard Preview" 
               className="rounded-xl shadow-2xl mx-auto w-full max-w-3xl border border-border/20"
             />
@@ -184,7 +184,7 @@ const LandingPage = () => {
               transition={{ duration: 0.6 }}
             >
               <img 
-                src="/placeholder.svg" // Replace with relevant illustration/screenshot
+                src="https://preview.redd.it/i7d28nuvexk31.png?width=1080&crop=smart&auto=webp&s=2585272a90b54c6f908f70ee7483c8d70f05a6d7" // Replace with relevant illustration/screenshot
                 alt="Group Expense Splitting" 
                 className="rounded-xl shadow-xl border border-border/20" 
               />

@@ -360,6 +360,7 @@ const Recurring = () => {
               <SelectContent>
                 <SelectItem value="utilities">Utilities</SelectItem>
                 <SelectItem value="entertainment">Entertainment</SelectItem>
+                <SelectItem value="investments">Investments</SelectItem>
                 <SelectItem value="health">Health</SelectItem>
                 <SelectItem value="housing">Housing</SelectItem>
                 <SelectItem value="insurance">Insurance</SelectItem>

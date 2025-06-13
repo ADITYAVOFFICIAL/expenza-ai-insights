@@ -1,10 +1,4 @@
 import { Client, Account, Databases, Storage, Functions, ID, Query, Models, Permission, Role } from 'appwrite';
-// Remove or modify the conflicting import from './config'
-// For example, if './config' only exports specific collection IDs not part of the main COLLECTIONS object, 
-// you might selectively import them, but avoid importing ID, Query, storage, DATABASE_ID, COLLECTIONS, STORAGE_BUCKET_ID from there.
-// For now, we'll assume the line below is the primary source of conflict for the reported errors and remove it.
-// import { ID, Permission, Role, Query, storage, DATABASE_ID, DATABASES, COLLECTIONS, USER_PROFILES_COLLECTION_ID, EXPENSES_COLLECTION_ID, RECURRING_EXPENSES_COLLECTION_ID, ALLOWANCES_COLLECTION_ID, GOALS_COLLECTION_ID, GROUPS_COLLECTION_ID, GROUP_EXPENSES_COLLECTION_ID, STORAGE_BUCKET_ID } from './config';
-
 const client = new Client();
 
 client
@@ -166,16 +160,14 @@ export const databaseService = {
       { ...data, createdAt: now, updatedAt: now }
     );
   },
-  async getExpenses(userId: string, limit = 50) {
-    return databases.listDocuments(
-      DATABASE_ID,
-      COLLECTIONS.EXPENSES,
-      [
-        Query.equal('userId', userId), // Assuming expenses are primarily tied to a user
-        Query.limit(limit),
-        Query.orderDesc('$createdAt')
-      ]
-    );
+  async getExpenses(userId: string, limit: number = 100, offset: number = 0) { // Default limit
+    const queries: any[] = [
+      Query.equal('userId', userId),
+      Query.orderDesc('date'), // Or $createdAt
+      Query.limit(limit),
+      Query.offset(offset)
+    ];
+    return databases.listDocuments(DATABASE_ID, COLLECTIONS.EXPENSES, queries);
   },
   async getGroupExpenses(groupId: string, limit = 5) { // New function
     return databases.listDocuments(

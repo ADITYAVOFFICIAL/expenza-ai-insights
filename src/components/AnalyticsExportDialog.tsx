@@ -11,11 +11,7 @@ import { Allowance } from '@/lib/allowanceService'; // Assuming Allowance type i
 import { Goal } from '@/types/goal'; // Assuming Goal type is imported
 import { toast } from '@/hooks/use-toast'; // Changed useToast to toast
 import { useIsMobile } from '@/hooks/use-mobile';
-import ExcelJS from 'exceljs'; // Added ExcelJS import
 import { format, parseISO } from 'date-fns'; // Added parseISO and format
-import jsPDF from 'jspdf'; // Added jsPDF import
-import 'jspdf-autotable';
-import html2canvas from 'html2canvas'; // For capturing charts as images
 // Data structure interfaces (assuming these are consistent with Analytics.tsx)
 interface MonthlyTrend {
   month: string;

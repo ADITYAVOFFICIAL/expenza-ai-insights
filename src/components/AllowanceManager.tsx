@@ -188,7 +188,7 @@ const AllowanceManager: React.FC<AllowanceManagerProps> = ({
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
-                      <Badge variant={allowance.isActive ? "default" : "secondary"} className={cn("text-xs mb-1 shrink-0", allowance.isActive ? "bg-success text-success-foreground hover:bg-success/90" : "bg-muted text-muted-foreground")}>
+                      <Badge variant={allowance.isActive ? "default" : "secondary"} className={cn("text-xs mb-1 shrink-0", allowance.isActive ? "bg-success text-gray-800 hover:bg-success/90" : "bg-muted text-muted-foreground")}>
                         {allowance.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                       <div className="flex gap-1">
