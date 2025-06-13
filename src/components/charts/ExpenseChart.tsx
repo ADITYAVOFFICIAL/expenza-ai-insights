@@ -27,16 +27,17 @@ const ExpenseChart = () => {
           tick={{ fontSize: 12 }}
           tickFormatter={(value) => `₹${value}`}
         />
-        <Tooltip
-          formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-          labelClassName="text-sm font-medium"
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '8px',
-            color: 'hsl(var(--foreground))',
-          }}
-        />
+         <Tooltip
+            formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
+            contentStyle={{
+              backgroundColor: 'hsl(var(--background))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '8px',
+              color: 'hsl(var(--foreground))', // General text color for the tooltip box
+            }}
+            itemStyle={{ color: 'hsl(var(--foreground))' }} // Styles the value part, e.g., "₹21,024"
+            labelStyle={{ color: 'hsl(var(--foreground))' }} // Styles the label part, e.g., "Amount"
+          />
         <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>

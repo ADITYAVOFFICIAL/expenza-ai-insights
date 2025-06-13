@@ -694,20 +694,21 @@ const Reports = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number, name: string) => { // name is category ID
                         const categoryDetail = uniqueCategories.find(c => c.id === name);
                         const displayName = categoryDetail ? categoryDetail.label : name;
                         return [`₹${value.toLocaleString()}`, displayName];
-                    }} 
-                    contentStyle={{
-                        backgroundColor: 'hsl(var(--background))', 
-                        border: '1px solid hsl(var(--border))', 
-                        borderRadius: 'var(--radius)',
-                        color: 'hsl(var(--foreground))',
-                        fontSize: isMobile ? '10px' : '12px',
-                    }}
-                  />
+                      }}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--background))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--foreground))', // General text color for the tooltip box
+                      }}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }} // Styles the value part, e.g., "₹21,024"
+                      labelStyle={{ color: 'hsl(var(--foreground))' }} // Styles the label part, e.g., "Amount"
+                    />
                   <Legend
                     iconSize={legendIconSize}
                     wrapperStyle={{ fontSize: legendFontSize, paddingTop: isMobile ? '5px' : '0' }}

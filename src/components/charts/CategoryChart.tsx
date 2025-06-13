@@ -27,15 +27,17 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
             <Cell key={`cell-${index}`} fill={entry.color} />
           ))}
         </Pie>
-        <Tooltip
-          formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--background))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '8px',
-            color: 'hsl(var(--accent))',
-          }}
-        />
+         <Tooltip
+            formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Amount']}
+            contentStyle={{
+              backgroundColor: 'hsl(var(--background))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '8px',
+              color: 'hsl(var(--foreground))', // General text color for the tooltip box
+            }}
+            itemStyle={{ color: 'hsl(var(--foreground))' }} // Styles the value part, e.g., "₹21,024"
+            labelStyle={{ color: 'hsl(var(--foreground))' }} // Styles the label part, e.g., "Amount"
+          />
         <Legend 
           verticalAlign="bottom" 
           height={36}
