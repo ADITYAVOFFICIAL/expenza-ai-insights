@@ -17,6 +17,8 @@ import { toast } from '@/hooks/use-toast';
 import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils'; // Added this import
 import categoriesData from '@/data/categories.json'; // Import categories data
+import { BarChart, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, PieChart, Pie, Cell } from 'recharts';
+
 const quickActions = [
   { icon: Plus, label: 'Add Expense', subtitle: 'Log a new transaction', href: '/add-expense' },
   { icon: BarChart3, label: 'View Analytics', subtitle: 'Track your spending', href: '/analytics' },

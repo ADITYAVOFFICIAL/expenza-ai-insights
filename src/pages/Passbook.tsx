@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { BookOpenText, AlertTriangle, Repeat, Search, Filter as FilterIcon, XCircle, PlusCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { databaseService } from '@/lib/appwrite';
+import { databaseService, GenericDocData, COLLECTIONS } from '@/lib/appwrite'; // Added COLLECTIONS
 import { Expense, RecurringExpense } from '@/types/expense';
 import ExpenseCard from '@/components/ExpenseCard';
 import { toast } from '@/hooks/use-toast';
@@ -40,7 +40,6 @@ import ExpenseForm from '@/components/ExpenseForm';
 import { Allowance } from '@/lib/allowanceService';
 import banksData from '@/data/banks.json';
 import paymentAppsData from '@/data/paymentApps.json'; // Import payment apps data
-import { GenericDocData } from '@/lib/appwrite';
 
 interface GroupedTransaction {
   dateLabel: string;
