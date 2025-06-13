@@ -61,7 +61,8 @@ const SidebarContentInternal: React.FC<SidebarContentInternalProps> = ({ showLog
         </div>
       )}
 
-      <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6 overflow-y-auto no-scrollbar">
+      {/* Adjusted nav: removed overflow-y-auto and no-scrollbar from this element */}
+      <nav className="flex-1 p-3 lg:p-4 space-y-4 lg:space-y-6">
         {/* Main Actions */}
         <div className="space-y-1 lg:space-y-2">
           <div className="flex items-center space-x-2 px-2 lg:px-3 mb-2 lg:mb-3">
@@ -241,8 +242,8 @@ const Sidebar = () => {
                 </button>
               </div>
               
-              {/* Scrollable content area for mobile sidebar */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Scrollable content area for mobile sidebar - this div handles scrolling */}
+              <div className="flex-1 overflow-y-auto no-scrollbar">
                 <SidebarContentInternal showLogo={false} onLinkClick={closeMobileSidebar} />
               </div>
             </motion.div>
