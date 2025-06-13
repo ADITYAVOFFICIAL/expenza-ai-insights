@@ -2,14 +2,14 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { TrendingUp, UserPlus, Goal, Users, AlertCircle } from 'lucide-react'; // Added more icons
+import { TrendingUp, UserPlus, Goal, Users, AlertCircle } from 'lucide-react';
 
 export interface ActivityItem {
   id: string;
-  type: 'expense_added' | 'goal_created' | 'group_joined' | 'allowance_updated' | 'system_alert' | string; // Allow custom types
+  type: 'expense_added' | 'goal_created' | 'group_joined' | 'allowance_updated' | 'system_alert' | string;
   description: string;
-  timestamp: string; // ISO date string
-  user?: string; // Name or ID of the user who performed action, or 'System'
+  timestamp: string;
+  user?: string;
   avatarUrl?: string;
   icon?: React.ElementType;
 }
@@ -22,7 +22,7 @@ const typeIcons: { [key: string]: React.ElementType } = {
   expense_added: TrendingUp,
   goal_created: Goal,
   group_joined: UserPlus,
-  allowance_updated: TrendingUp, // Could be a different icon
+  allowance_updated: TrendingUp,
   system_alert: AlertCircle,
   default: Users,
 };
@@ -57,8 +57,8 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ items }) => {
                   {item.user ? item.user.substring(0, 2).toUpperCase() : <IconComponent className="w-4 h-4" />}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <p className="text-sm text-foreground leading-tight" dangerouslySetInnerHTML={{ __html: item.description }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground leading-tight break-words" dangerouslySetInnerHTML={{ __html: item.description }} />
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(parseISO(item.timestamp), { addSuffix: true })}
                 </p>

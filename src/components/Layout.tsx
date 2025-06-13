@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -12,7 +11,7 @@ const Layout = () => {
         <div className="flex-1 lg:ml-72">
           <Header />
           <main className="p-4 lg:p-6 min-h-[calc(100vh-4rem)]">
-            <div className="container mx-auto">
+            <div className="w-full">
               <Outlet />
             </div>
           </main>
