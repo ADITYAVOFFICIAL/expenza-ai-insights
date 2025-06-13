@@ -5,8 +5,9 @@
 @layer base {
   :root {
     --background: 220 20% 98%;
+    --lbackground: 220 20% 98%;
     --foreground: 220 20% 10%;
-
+    --cyan-500-rgb: 72 209 204;
     --card: 0 0% 100%;
     --card-foreground: 220 20% 10%;
 
@@ -52,7 +53,7 @@
   .dark {
     --background: 220 15% 10%;
     --foreground: 220 15% 90%;
-
+--lbackground: 220 15% 10%;
     --card: 220 15% 15%;
     --card-foreground: 220 15% 90%;
 
@@ -99,4 +100,77 @@
 .no-scrollbar {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* Remove or replace the old .aurora-image-background styles that hide the effect */
+/*
+.aurora-image-background {
+  width: 100%;
+  min-height: 100vh;
+  background-color: hsl(220, 15%, 8%);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.aurora-image-background::before,
+.aurora-image-background::after {
+  display: none !important;
+}
+*/
+
+/* New Aurora Background Styles */
+.aurora-image-background {
+  --aurora-cyan-hsl: 187 90% 45%; /* Using a cyan color similar to Tailwind's cyan-500 for the glow */
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  background-color: hsl(220, 15%, 5%); /* Very dark base background, matching the target image */
+  overflow: hidden; /* Prevent pseudo-elements from causing scroll */
+}
+
+/* Soft, wider cyan glow */
+.aurora-image-background::before {
+  content: "";
+  display: block; /* Ensure the pseudo-element is displayed */
+  position: absolute;
+  top: -10%; /* Extend slightly beyond viewport for smooth edges */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%; /* Width of the main glow */
+  height: 120%; /* Height of the main glow */
+  background-image: linear-gradient(
+    to bottom,
+    hsla(var(--aurora-cyan-hsl), 0) 0%,      /* Transparent at edges */
+    hsla(var(--aurora-cyan-hsl), 0.4) 50%,   /* Peak opacity in center */
+    hsla(var(--aurora-cyan-hsl), 0) 100%
+  );
+  filter: blur(60px); /* Significant blur for a soft, diffuse glow */
+  mix-blend-mode: screen; /* Brightens the dark background */
+  opacity: 0.7; /* Adjust overall intensity of the glow */
+  z-index: 1; /* Layering context for pseudo-elements */
+  pointer-events: none; /* Allow clicks to pass through */
+}
+
+/* Sharper, striped cyan effect in the center */
+.aurora-image-background::after {
+  content: "";
+  display: block; /* Ensure the pseudo-element is displayed */
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%; /* Narrower than the main glow, for the striped core */
+  height: 100%;
+  background-image: repeating-linear-gradient(
+    to right, /* Vertical stripes */
+    hsla(var(--aurora-cyan-hsl), 0.25) 0px,
+    hsla(var(--aurora-cyan-hsl), 0.25) 2px, /* Stripe color and width */
+    transparent 2px,
+    transparent 5px  /* Gap color and width */
+  );
+  filter: blur(2px); /* Minimal blur to slightly soften stripes */
+  mix-blend-mode: screen;
+  opacity: 0.5; /* Adjust intensity of the stripes */
+  z-index: 2; /* Above the softer glow, content is on z-10 (from LandingPage.tsx) */
+  pointer-events: none; /* Allow clicks to pass through */
 }

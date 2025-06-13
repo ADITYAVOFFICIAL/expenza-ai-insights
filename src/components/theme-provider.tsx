@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 
 type Theme = "dark" | "light" | "system"
 
@@ -26,37 +27,54 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme", // Ensure this matches your storage key in App.tsx
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  const { user, updateUserThemePreferences } = useAuth(); // Get user and update function
+
+  const [theme, setThemeState] = useState<Theme>(() => {
+    // Prioritize user profile theme, then localStorage, then default
+    const userTheme = user?.themePreference;
+    if (userTheme) return userTheme;
+    const storedTheme = localStorage.getItem(storageKey) as Theme;
+    return storedTheme || defaultTheme;
+  });
+
+  useEffect(() => {
+    // If user logs in/out or their profile theme changes, update component state
+    if (user?.themePreference && user.themePreference !== theme) {
+      setThemeState(user.themePreference);
+    } else if (!user && localStorage.getItem(storageKey) !== theme) {
+      // User logged out, fall back to localStorage or default
+      setThemeState((localStorage.getItem(storageKey) as Theme) || defaultTheme);
+    }
+  }, [user, theme, storageKey, defaultTheme]);
+
 
   useEffect(() => {
     const root = window.document.documentElement
 
     root.classList.remove("light", "dark")
 
+    let effectiveTheme = theme;
     if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      effectiveTheme = window.matchMedia("(prefers-color-scheme: dark)")
         .matches
         ? "dark"
         : "light"
-
-      root.classList.add(systemTheme)
-      // If you want to reflect the actual system theme back to the state
-      // and localStorage, you could call setTheme(systemTheme) here,
-      // but be mindful of potential loops if not handled carefully.
-      return
     }
+    root.classList.add(effectiveTheme);
 
-    root.classList.add(theme)
   }, [theme])
+
+  const setTheme = (newTheme: Theme) => {
+    localStorage.setItem(storageKey, newTheme); // Keep localStorage for immediate offline access/fallback
+    setThemeState(newTheme);
+    if (user?.$id) {
+      updateUserThemePreferences(user.$id, { themePreference: newTheme });
+    }
+  };
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme)
-      setTheme(theme)
-    },
+    setTheme,
   }
 
   return (

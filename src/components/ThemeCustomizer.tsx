@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Added useEffect
 import { Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 // Define your theme color options
 // The `primary` and `accent` values should be HSL color components (H S L) as strings
@@ -22,57 +23,70 @@ const themeColors = [
 ];
 
 interface ThemeCustomizerProps {
-  onThemeChange: (theme: { name: string; primary: string; accent: string }) => void;
+  onThemeChange: (theme: { name: string; primary: string; accent: string }) => void; // Keep this for local UI updates if needed
 }
 
 const ThemeCustomizer: React.FC<ThemeCustomizerProps> = ({ onThemeChange }) => {
+  const { user, updateUserThemePreferences, refreshUser } = useAuth(); // Get user and update function
+
   const applyTheme = (selectedTheme: { name: string; primary: string; accent: string }) => {
     const root = document.documentElement;
     
-    // Update CSS variables for primary and accent colors
     root.style.setProperty('--primary', selectedTheme.primary);
     root.style.setProperty('--accent', selectedTheme.accent);
-    
-    // Update related variables if they should follow the primary color
-    root.style.setProperty('--ring', selectedTheme.primary); // Ring color often matches primary
-    
-    // Update sidebar colors that depend on primary/accent
+    root.style.setProperty('--ring', selectedTheme.primary);
     root.style.setProperty('--sidebar-primary', selectedTheme.primary);
     root.style.setProperty('--sidebar-ring', selectedTheme.primary);
-    // If sidebar-accent should also change, add:
-    // root.style.setProperty('--sidebar-accent', selectedTheme.accent);
 
-    // Persist the selected theme's primary and accent colors to localStorage
-    // This allows the theme to persist across sessions.
-    // Note: The ThemeProvider handles light/dark, this handles color variations.
+    // Persist to localStorage for immediate UI update and offline fallback
     localStorage.setItem('expenza-custom-theme-colors', JSON.stringify({
       primary: selectedTheme.primary,
       accent: selectedTheme.accent,
     }));
     
-    onThemeChange(selectedTheme);
+    if (user?.$id) {
+      updateUserThemePreferences(user.$id, {
+        themeColorsPrimary: selectedTheme.primary,
+        themeColorsAccent: selectedTheme.accent,
+      });
+    }
+    onThemeChange(selectedTheme); // Call prop for any immediate parent component needs
   };
 
-  // Effect to load and apply custom theme colors on component mount
-  React.useEffect(() => {
-    const storedColors = localStorage.getItem('expenza-custom-theme-colors');
-    if (storedColors) {
-      try {
-        const parsedColors = JSON.parse(storedColors);
-        const matchingTheme = themeColors.find(
-          t => t.primary === parsedColors.primary && t.accent === parsedColors.accent
-        );
-        if (matchingTheme) {
-          applyTheme(matchingTheme);
-        } else if (parsedColors.primary && parsedColors.accent) {
-          // Apply stored custom colors even if not in predefined list
-           applyTheme({ name: "Custom", ...parsedColors });
+  useEffect(() => {
+    let storedPrimary = user?.themeColorsPrimary;
+    let storedAccent = user?.themeColorsAccent;
+
+    // Fallback to localStorage if user profile doesn't have it (e.g., before first save)
+    if (!storedPrimary || !storedAccent) {
+        const storedColorsRaw = localStorage.getItem('digisamaharta-custom-theme-colors');
+        if (storedColorsRaw) {
+            try {
+                const parsedColors = JSON.parse(storedColorsRaw);
+                storedPrimary = parsedColors.primary;
+                storedAccent = parsedColors.accent;
+            } catch (e) {
+                console.error("Failed to parse stored theme colors from localStorage:", e);
+            }
         }
-      } catch (e) {
-        console.error("Failed to parse stored theme colors:", e);
-      }
     }
-  }, []);
+    
+    if (storedPrimary && storedAccent) {
+      const matchingTheme = themeColors.find(
+        t => t.primary === storedPrimary && t.accent === storedAccent
+      );
+      const themeToApply = matchingTheme || { name: "Custom", primary: storedPrimary, accent: storedAccent };
+      
+      // Apply directly without calling `applyTheme` to avoid loop / redundant DB update on load
+      const root = document.documentElement;
+      root.style.setProperty('--primary', themeToApply.primary);
+      root.style.setProperty('--accent', themeToApply.accent);
+      root.style.setProperty('--ring', themeToApply.primary);
+      root.style.setProperty('--sidebar-primary', themeToApply.primary);
+      root.style.setProperty('--sidebar-ring', themeToApply.primary);
+      // onThemeChange(themeToApply); // Optionally call if parent needs to know on load
+    }
+  }, [user, onThemeChange]); // Rerun if user object changes
 
 
   return (

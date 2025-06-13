@@ -79,6 +79,7 @@ export interface RecurringExpense {
   $updatedAt?: string;
 }
 
+// ...existing code...
 export interface UserProfile {
   $id: string;
   name: string;
@@ -94,6 +95,28 @@ export interface UserProfile {
   phoneNumber?: string; // Added from Profile.tsx
   avatarUrl?: string; // Added from Profile.tsx (consistent with profilePictureUrl)
   currency?: string; // Added from Profile.tsx (consistent with preferredCurrency)
+  idealRetirementAge?: number;
+  country?: string;
+  themePreference?: 'light' | 'dark' | 'system';
+  themeColorsPrimary?: string; // e.g., "150 60% 45%"
+  themeColorsAccent?: string;  // e.g., "210 70% 55%"
   $createdAt?: string;
   $updatedAt?: string;
+}
+interface UserProfileUpdateData {
+  name?: string;
+  phoneNumber?: string;
+  currency?: string;
+  avatarUrl?: string;
+  age?: number;
+  occupation?: string;
+  incomeLevel?: string; // e.g., "low", "medium", "high" or a numeric range string
+  financialKnowledge?: 'beginner' | 'intermediate' | 'advanced';
+  riskTolerance?: 'low' | 'medium' | 'high';
+  primaryBank?: string;
+  idealRetirementAge?: number;
+  country?: string;
+  themePreference?: 'light' | 'dark' | 'system';
+  themeColorsPrimary?: string;
+  themeColorsAccent?: string;
 }

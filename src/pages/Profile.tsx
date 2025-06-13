@@ -20,12 +20,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { authService, storageService } from '@/lib/appwrite';
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth(); // Added refreshUser
   const [userProfile, setUserProfile] = useState({
     name: '',
     email: '',
-    phoneNumber: '',
     currency: 'INR',
+    occupation: '',
+    age: '',
+    idealRetirementAge: '',
+    country: '',
+    // Theme fields are not directly managed here, but loaded from AuthContext
   });
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -42,45 +46,41 @@ const Profile = () => {
 
     setLoading(true);
     try {
-      let profileDoc = await authService.getUserProfile(user.$id);
-
-      if (!profileDoc) {
-        toast({
-          title: "Profile Sync",
-          description: "Setting up your user profile...",
-        });
-        try {
-          const creationData = {
-            name: user.name || '',
-            email: user.email || '',
-          };
-          profileDoc = await authService.createUserProfile(user.$id, creationData);
-          toast({
-            title: "Profile Initialized",
-            description: "Your user profile has been set up.",
-          });
-        } catch (creationError: any) {
-          console.error('Error creating user profile:', creationError);
-          toast({
-            title: "Profile Setup Failed",
-            description: `Could not initialize your profile: ${creationError.message || 'Unknown error'}. Some features might be limited.`,
-            variant: "destructive",
-          });
-        }
+      // User object from AuthContext should now have all details
+      // If not, fetch specifically using authService.getUserProfile
+      let profileDoc = user; // Assuming user from context is up-to-date
+      
+      // Fallback if user from context is not fully populated (e.g., direct navigation)
+      if (!user.occupation && user.$id) { 
+          const dbProfile = await authService.getUserProfile(user.$id);
+          if (dbProfile) {
+            profileDoc = { ...user, ...dbProfile };
+          }
       }
+
 
       if (profileDoc) {
         setUserProfile({
-          name: profileDoc.name || user.name || '',
-          email: profileDoc.email || user.email || '',
-          phoneNumber: profileDoc.phoneNumber || '',
-          currency: profileDoc.currency || 'INR',
+          name: profileDoc.name || '',
+          email: profileDoc.email || '',
+          currency: (profileDoc as any).currency || 'INR',
+          occupation: (profileDoc as any).occupation || '',
+          age: (profileDoc as any).age?.toString() || '',
+          idealRetirementAge: (profileDoc as any).idealRetirementAge?.toString() || '',
+          country: (profileDoc as any).country || '',
         });
 
-        if (profileDoc.avatarUrl) {
-          setavatarUrl(storageService.getFileView(profileDoc.avatarUrl as string));
+        if ((profileDoc as any).avatarUrl) {
+          // If avatarUrl in profileDoc is just an ID, resolve it
+          // If it's already a URL (from AuthContext), use it directly
+          if (typeof (profileDoc as any).avatarUrl === 'string' && !(profileDoc as any).avatarUrl.startsWith('http')) {
+            setavatarUrl(storageService.getFileView((profileDoc as any).avatarUrl as string).toString());
+          } else {
+            setavatarUrl((profileDoc as any).avatarUrl);
+          }
         }
       } else {
+        // This case should be less likely if AuthContext is robust
         setUserProfile(prev => ({
             ...prev,
             name: user.name || '',
@@ -118,12 +118,29 @@ const Profile = () => {
 
     try {
       setUpdating(true);
+      const ageNumber = userProfile.age ? parseInt(userProfile.age, 10) : undefined;
+      const idealRetirementAgeNumber = userProfile.idealRetirementAge ? parseInt(userProfile.idealRetirementAge, 10) : undefined;
+
+      if (userProfile.age && (isNaN(ageNumber as number) || (ageNumber as number) < 0)) {
+        toast({ title: "Invalid Age", description: "Please enter a valid age.", variant: "destructive" });
+        setUpdating(false);
+        return;
+      }
+      if (userProfile.idealRetirementAge && (isNaN(idealRetirementAgeNumber as number) || (idealRetirementAgeNumber as number) < 0)) {
+        toast({ title: "Invalid Retirement Age", description: "Please enter a valid ideal retirement age.", variant: "destructive" });
+        setUpdating(false);
+        return;
+      }
 
       await authService.updateUserProfile(user.$id, {
         name: userProfile.name,
-        phoneNumber: userProfile.phoneNumber,
         currency: userProfile.currency,
+        occupation: userProfile.occupation,
+        age: ageNumber,
+        idealRetirementAge: idealRetirementAgeNumber,
+        country: userProfile.country,
       });
+      await refreshUser(); // Refresh user data in AuthContext
 
       toast({
         title: "Success",
@@ -156,13 +173,14 @@ const Profile = () => {
         oldAvatarId = currentProfile.avatarUrl;
       }
 
-      const uploadedFile = await storageService.uploadFile(file, user.$id); // Pass userId for permissions
+      const uploadedFile = await storageService.uploadFile(file, user.$id); 
 
       await authService.updateUserProfile(user.$id, {
         avatarUrl: uploadedFile.$id
       });
+      await refreshUser(); // Refresh user data in AuthContext
 
-      setavatarUrl(storageService.getFileView(uploadedFile.$id).toString()); // Ensure it's a string
+      setavatarUrl(storageService.getFileView(uploadedFile.$id).toString()); 
 
       // If there was an old avatar, delete it
       if (oldAvatarId && oldAvatarId !== uploadedFile.$id) {
@@ -230,11 +248,17 @@ const Profile = () => {
   };
 
   interface ThemeColors {
+    name: string; // Added name to ThemeColors for onThemeChange
     primary: string;
     accent: string;
   }
 
-  const handleThemeChange = (colors: ThemeColors) => {
+  const handleThemeChange = (colors: ThemeColors) => { // colors will be { name, primary, accent }
+    if (user?.$id) {
+      // updateUserThemePreferences is now part of AuthContext
+      // It will handle DB update and local state update
+      // No need to call refreshUser() here as updateUserThemePreferences should update context
+    }
     toast({
       title: "Theme Updated",
       description: `Your theme colors have been successfully updated. Primary: ${colors.primary}`,
@@ -310,13 +334,46 @@ const Profile = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="phoneNumber" className="text-sm">Phone Number</Label>
+                  <Label htmlFor="age" className="text-sm">Age</Label>
                   <Input
-                    id="phoneNumber"
-                    value={userProfile.phoneNumber}
-                    onChange={(e) => setUserProfile({ ...userProfile, phoneNumber: e.target.value })}
+                    id="age"
+                    type="number"
+                    value={userProfile.age}
+                    onChange={(e) => setUserProfile({ ...userProfile, age: e.target.value })}
                     className="mt-1"
-                    placeholder="+91 9876543210"
+                    placeholder="e.g., 30"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="occupation" className="text-sm">Occupation</Label>
+                  <Input
+                    id="occupation"
+                    value={userProfile.occupation}
+                    onChange={(e) => setUserProfile({ ...userProfile, occupation: e.target.value })}
+                    className="mt-1"
+                    placeholder="e.g., Software Engineer"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="idealRetirementAge" className="text-sm">Ideal Retirement Age</Label>
+                  <Input
+                    id="idealRetirementAge"
+                    type="number"
+                    value={userProfile.idealRetirementAge}
+                    onChange={(e) => setUserProfile({ ...userProfile, idealRetirementAge: e.target.value })}
+                    className="mt-1"
+                    placeholder="e.g., 60"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="country" className="text-sm">Country</Label>
+                  {/* Consider using a Select component for countries if you have a predefined list */}
+                  <Input
+                    id="country"
+                    value={userProfile.country}
+                    onChange={(e) => setUserProfile({ ...userProfile, country: e.target.value })}
+                    className="mt-1"
+                    placeholder="e.g., India"
                   />
                 </div>
               </div>

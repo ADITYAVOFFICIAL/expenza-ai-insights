@@ -53,7 +53,7 @@ const LandingPage = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md">
               <Wallet className="w-6 h-6 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold text-foreground">Expenza</h1>
+            <h1 className="text-xl font-bold text-foreground">DigiSamahārta</h1>
           </Link>
           
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -97,7 +97,7 @@ const LandingPage = () => {
             variants={fadeInUp}
             className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto"
           >
-            Expenza helps you effortlessly track spending, manage group expenses, and achieve financial goals with AI-powered insights.
+            DigiSamahārta helps you effortlessly track spending, manage group expenses, and achieve financial goals with AI-powered insights.
           </motion.p>
           
           <motion.div 
@@ -119,7 +119,7 @@ const LandingPage = () => {
           <motion.div variants={fadeInUp} className="mt-16">
             <img 
               src="/placeholder.svg" // Replace with an actual product screenshot or illustration
-              alt="Expenza Dashboard Preview" 
+              alt="DigiSamahārta Dashboard Preview" 
               className="rounded-xl shadow-2xl mx-auto w-full max-w-3xl border border-border/20"
             />
           </motion.div>
@@ -172,7 +172,7 @@ const LandingPage = () => {
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Focus on What Matters</h2>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Expenza simplifies complex financial tasks so you can focus on your goals.
+              DigiSamahārta simplifies complex financial tasks so you can focus on your goals.
             </p>
           </motion.div>
 
@@ -224,7 +224,7 @@ const LandingPage = () => {
             Ready to Transform Your Finances?
           </h2>
           <p className="text-xl text-primary-foreground/90 mb-10 max-w-xl mx-auto">
-            Join thousands of users who are already managing their money smarter with Expenza.
+            Join thousands of users who are already managing their money smarter with DigiSamahārta.
           </p>
           <Link to="/signup">
             <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-gray-100 shadow-lg transform hover:scale-105 transition-transform duration-300">
@@ -241,9 +241,9 @@ const LandingPage = () => {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm">
               <Wallet className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-foreground">Expenza</span>
+            <span className="font-semibold text-foreground">DigiSamahārta</span>
           </div>
-          <p>&copy; {new Date().getFullYear()} Expenza. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} DigiSamahārta. All rights reserved.</p>
           <div className="mt-3 space-x-4">
             <Link to="/privacy" className="hover:text-primary">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-primary">Terms of Service</Link>

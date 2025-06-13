@@ -150,7 +150,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
   const getFilename = (extension: string): string => {
     const timeFilterPart = analyticsData?.timeFilterLabel.replace(/\s+/g, '_') || 'data';
     const datePart = new Date().toISOString().split('T')[0];
-    return `Expenza_Analytics_${timeFilterPart}_${datePart}.${extension}`;
+    return `DigiSamahārta_Analytics_${timeFilterPart}_${datePart}.${extension}`;
   };
 
   const captureChartAsImage = async (chartId: string): Promise<string | null> => {
@@ -177,7 +177,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
 
   const exportToCSVHandler = () => {
     if (!analyticsData) return;
-    let combinedCsvString = `Expenza Analytics Report\n`;
+    let combinedCsvString = `DigiSamahārta Analytics Report\n`;
     combinedCsvString += `Time Period: ${analyticsData.timeFilterLabel}\n`;
     combinedCsvString += `Export Date: ${new Date().toLocaleDateString()}\n\n`;
 
@@ -235,7 +235,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
       for (let i = 1; i <= pageCount; i++) {
         pdf.setPage(i);
         pdf.text(
-          `Page ${i} of ${pageCount} | Generated on: ${generationDate} | Expenza Analytics`,
+          `Page ${i} of ${pageCount} | Generated on: ${generationDate} | DigiSamahārta Analytics`,
           pageMargin,
           pdf.internal.pageSize.getHeight() - 10
         );
@@ -249,7 +249,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
     pdf.setFontSize(22);
     pdf.setFont('helvetica', 'bold');
     pdf.setTextColor(whiteColor[0], whiteColor[1], whiteColor[2]);
-    pdf.text('Expenza Analytics Report', pageWidth / 2, 15, { align: 'center' });
+    pdf.text('DigiSamahārta Analytics Report', pageWidth / 2, 15, { align: 'center' });
 
     pdf.setFontSize(10);
     pdf.setTextColor(whiteColor[0], whiteColor[1], whiteColor[2]);
@@ -409,7 +409,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
   const exportToXLSXHandler = async () => {
     if (!analyticsData) return;
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Expenza App';
+    workbook.creator = 'DigiSamahārta App';
     workbook.created = new Date();
     workbook.modified = new Date();
 

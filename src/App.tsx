@@ -38,13 +38,13 @@ const AppContent = () => {
               style={{ animationDelay: "0.3s" }}
             ></div>
 
-            {/* Expenza Icon */}
+            {/* DigiSamahārta Icon */}
             <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl">
               <Wallet className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
           <p className="text-lg font-medium text-foreground animate-pulse">
-            Loading Expenza...
+            Loading DigiSamahārta...
           </p>
           <p className="text-sm text-muted-foreground mt-1">
             Please wait a moment.
@@ -89,17 +89,17 @@ const AppContent = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system" storageKey="expenza-ui-theme">
-        <TooltipProvider>
-          <AuthProvider>
+      <AuthProvider> {/* Moved AuthProvider to wrap ThemeProvider */}
+        <ThemeProvider defaultTheme="system" storageKey="digisamaharta-ui-theme">
+          <TooltipProvider>
             <div className="min-h-screen w-full">
               <Toaster />
               <Sonner />
               <AppContent />
             </div>
-          </AuthProvider>
-        </TooltipProvider>
-      </ThemeProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider> {/* AuthProvider ends */}
     </QueryClientProvider>
   );
 };

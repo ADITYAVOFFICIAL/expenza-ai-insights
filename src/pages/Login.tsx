@@ -25,7 +25,7 @@ const Login = () => {
       await login(email, password);
       toast({
         title: "Login Successful",
-        description: "Welcome back to Expenza!",
+        description: "Welcome back to DigiSamahārta!",
       });
       navigate('/');
     } catch (error: any) {
@@ -47,7 +47,7 @@ const Login = () => {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
             <Wallet className="w-7 h-7 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground ml-3">Expenza</h1>
+          <h1 className="text-2xl font-bold text-foreground ml-3">DigiSamahārta</h1>
         </div>
 
         <Card>

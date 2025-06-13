@@ -39,17 +39,14 @@ interface UserProfileCreationData {
 }
 interface UserProfileUpdateData {
   name?: string;
-  phoneNumber?: string;
   currency?: string;
   avatarUrl?: string;
-  // Add Gemini-related fields
   age?: number;
   occupation?: string;
   incomeLevel?: string; // e.g., "low", "medium", "high" or a numeric range string
   financialKnowledge?: 'beginner' | 'intermediate' | 'advanced';
   riskTolerance?: 'low' | 'medium' | 'high';
   primaryBank?: string;
-  // profilePictureUrl?: string; // If you have a separate field for this
 }
 
 export interface GenericDocData { // Made exportable for use in other files if needed
@@ -114,8 +111,6 @@ export const authService = {
         userId: userId, // Storing userId also as a field for easier querying if needed
         createdAt: now,
         updatedAt: now,
-        // Initialize other fields as per your UserProfile type in expense.ts
-        phoneNumber: undefined,
         currency: "INR", // Default currency
         avatarUrl: undefined,
         profilePictureUrl: undefined,
@@ -125,6 +120,11 @@ export const authService = {
         financialKnowledge: undefined,
         riskTolerance: undefined,
         primaryBank: undefined,
+        idealRetirementAge: undefined,
+        country: undefined,
+        themePreference: 'system', // Default theme preference
+        themeColorsPrimary: undefined, // Default theme colors
+        themeColorsAccent: undefined,  // Default theme colors
       }
     );
   },

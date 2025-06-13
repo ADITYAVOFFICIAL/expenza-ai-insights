@@ -445,13 +445,23 @@ const Goals = () => {
         </DialogContent>
       </Dialog>
 
-      {/* AI Recommendations (Static as per original) */}
+ {/* Finance Tips */}
       <Card>
-        <CardHeader><CardTitle className="text-lg">AI Goal Recommendations</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-lg">Finance Tips</CardTitle></CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg"><h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">📈 Optimization Tip</h4><p className="text-sm text-blue-800 dark:text-blue-200">Based on your spending pattern, you can increase your Emergency Fund contribution by ₹2,000/month by reducing dining out expenses.</p></div>
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg"><h4 className="font-medium text-green-900 dark:text-green-100 mb-2">💡 New Goal Suggestion</h4><p className="text-sm text-green-800 dark:text-green-200">Consider setting up a "Health Insurance Premium" goal of ₹25,000 for next year's premium payment.</p></div>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">💡 Budgeting Basics</h4>
+              <p className="text-sm text-blue-800 dark:text-blue-200">Regularly review your spending and create a budget. Knowing where your money goes is the first step to financial control.</p>
+            </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">💰 Emergency Fund</h4>
+              <p className="text-sm text-green-800 dark:text-green-200">Aim to save at least 3-6 months of living expenses in an easily accessible emergency fund. This can help you handle unexpected costs without derailing your goals.</p>
+            </div>
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">📈 Smart Investing</h4>
+              <p className="text-sm text-purple-800 dark:text-purple-200">Consider long-term investment options that match your risk tolerance. Even small, regular investments can grow significantly over time.</p>
+            </div>
           </div>
         </CardContent>
       </Card>
