@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, FileText, FileSpreadsheet, X, Check, Loader2,Square, Settings2, Image as ImageIcon, BarChart3, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, ListChecks, Banknote, CalendarDays } from 'lucide-react';
+import { Download, FileText, FileSpreadsheet, X, Check, Loader2,Square, Settings2, Image as ImageIcon, CheckSquare, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, ListChecks, Banknote, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'; // Added DialogDescription
 import { Checkbox } from '@/components/ui/checkbox';

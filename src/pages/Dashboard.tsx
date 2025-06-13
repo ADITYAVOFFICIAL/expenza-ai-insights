@@ -12,7 +12,7 @@ import { Allowance, AllowanceData } from '@/lib/allowanceService'; // Ensure All
 import { Progress } from '@/components/ui/progress';
 import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
 import { useAuth } from '@/contexts/AuthContext'; // Added this import
-import { databaseService } from '@/lib/appwrite';
+import { databaseService, storageService, COLLECTIONS } from '@/lib/appwrite'; // Added storageService and COLLECTIONS
 import { toast } from '@/hooks/use-toast';
 import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils'; // Added this import
@@ -185,7 +185,7 @@ const Dashboard = () => {
       setTopCategoriesThisMonth(sortedCategories);
 
     } catch (err) {
-      console.error("Error fetching dashboard data:", err);
+      // console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data.");
       toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive" });
     } finally {
@@ -219,7 +219,7 @@ const Dashboard = () => {
           suggestions.sort((a, b) => a.name.localeCompare(b.name));
           setBankSuggestionsForEdit(suggestions);
         } catch (error) {
-          console.error("Error fetching bank suggestions for edit:", error);
+          // console.error("Error fetching bank suggestions for edit:", error);
           toast({ title: "Error", description: "Could not load bank suggestions for editing.", variant: "destructive" });
         }
       }
@@ -273,7 +273,7 @@ const Dashboard = () => {
       setEditingExpense(null);
       fetchData(); 
     } catch (error: any) {
-      console.error('Error updating expense:', error);
+      // console.error('Error updating expense:', error);
       toast({ title: "Error Updating Expense", description: error.message || "Failed to update expense. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmittingEdit(false);
@@ -299,9 +299,9 @@ const Dashboard = () => {
         if (billImageId) {
           try {
             await storageService.deleteFile(billImageId); // Delete associated bill image
-            console.log(`Bill image ${billImageId} deleted successfully.`);
+            // console.log(`Bill image ${billImageId} deleted successfully.`);
           } catch (fileError) {
-            console.error("Error deleting bill image:", fileError);
+            // console.error("Error deleting bill image:", fileError);
             // Optionally notify user, but primary deletion was successful
           }
         }
@@ -309,7 +309,7 @@ const Dashboard = () => {
         toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
         fetchData(); // Refresh data
       } catch (error) {
-        console.error("Error deleting expense:", error);
+        // console.error("Error deleting expense:", error);
         toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
       }
     }
@@ -322,7 +322,7 @@ const Dashboard = () => {
       toast({ title: "Allowance Added", description: "New allowance has been successfully added." });
       fetchData(); // Refresh data
     } catch (error) {
-      console.error("Error adding allowance:", error);
+      // console.error("Error adding allowance:", error);
       toast({ title: "Error", description: "Could not add the allowance.", variant: "destructive" });
     }
   };
@@ -334,7 +334,7 @@ const Dashboard = () => {
       toast({ title: "Allowance Updated", description: "Allowance has been successfully updated." });
       fetchData(); // Refresh data
     } catch (error) {
-      console.error("Error updating allowance:", error);
+      // console.error("Error updating allowance:", error);
       toast({ title: "Error", description: "Could not update the allowance.", variant: "destructive" });
     }
   };
@@ -346,7 +346,7 @@ const Dashboard = () => {
       toast({ title: "Allowance Deleted", description: "Allowance has been successfully deleted." });
       fetchData(); // Refresh data
     } catch (error) {
-      console.error("Error deleting allowance:", error);
+      // console.error("Error deleting allowance:", error);
       toast({ title: "Error", description: "Could not delete the allowance.", variant: "destructive" });
     }
   };

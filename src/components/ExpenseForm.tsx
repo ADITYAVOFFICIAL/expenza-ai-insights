@@ -11,7 +11,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import CategorySelector from './CategorySelector';
 import PaymentMethodSelector from './PaymentMethodSelector';
 import GroupSelector from './GroupSelector';
-import BillScanner from './BillScanner';
 import { Expense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { storageService } from '@/lib/appwrite';
@@ -457,20 +456,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Dialog open={showBillScanner} onOpenChange={setShowBillScanner}>
-              <DialogTrigger asChild>
-                <Button type="button" variant="outline" className="w-full">
-                  <Scan className="w-4 h-4 mr-2" />
-                  Scan Bill (OCR)
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <BillScanner 
-                  onScanComplete={handleBillScan}
-                  onClose={() => setShowBillScanner(false)}
-                />
-              </DialogContent>
-            </Dialog>
             <Button type="button" variant="outline" className="w-full asChild">
               <Label htmlFor="manual-bill-upload" className="cursor-pointer flex items-center justify-center w-full h-full m-0">
                 <Upload className="w-4 h-4 mr-2" />

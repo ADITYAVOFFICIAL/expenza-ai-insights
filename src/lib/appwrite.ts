@@ -37,12 +37,19 @@ interface UserProfileCreationData {
   name: string;
   email: string;
 }
-
 interface UserProfileUpdateData {
   name?: string;
   phoneNumber?: string;
   currency?: string;
   avatarUrl?: string;
+  // Add Gemini-related fields
+  age?: number;
+  occupation?: string;
+  incomeLevel?: string; // e.g., "low", "medium", "high" or a numeric range string
+  financialKnowledge?: 'beginner' | 'intermediate' | 'advanced';
+  riskTolerance?: 'low' | 'medium' | 'high';
+  primaryBank?: string;
+  // profilePictureUrl?: string; // If you have a separate field for this
 }
 
 export interface GenericDocData { // Made exportable for use in other files if needed

@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { TrendingUp, Calendar, Filter, Download, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Download, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BankChart from '@/components/charts/BankChart';
 import SavingsCategoryChart from '@/components/charts/SavingsCategoryChart';
 import SavingsTrackingChart from '@/components/charts/SavingsTrackingChart';
-import ExpenseChart from '@/components/charts/ExpenseChart'; // Assuming this is used for bank expenses/allowances
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
-import { databaseService } from '@/lib/appwrite';
+import { databaseService, authService } from '@/lib/appwrite'; // Added authService
 import { Expense, RecurringExpense } from '@/types/expense'; // Ensure RecurringExpense is in types
 import { Allowance } from '@/lib/allowanceService';
 import { Goal } from '@/types/goal';
@@ -36,6 +35,7 @@ import {
 } from 'date-fns';
 import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
 import { useIsMobile } from '@/hooks/use-mobile'; // Add this if not already present
+
 interface MonthlyTrend {
   month: string;
   expenses: number;
@@ -73,16 +73,16 @@ interface SavingsDataPoint { // From SavingsTrackingChart
 
 
 const Analytics = () => {
-  const isMobile = useIsMobile(); // Add this if not already present
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile(); // Existing
+  const [loading, setLoading] = useState(true); // For main analytics data
+  const [error, setError] = useState<string | null>(null); // For page data
 
-  const [timeFilter, setTimeFilter] = useState('thisMonth');
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]); // Added state for recurring
-  const [allowances, setAllowances] = useState<Allowance[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [timeFilter, setTimeFilter] = useState('thisMonth'); // Existing
+  const [expenses, setExpenses] = useState<Expense[]>([]); // Existing
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]); // Existing
+  const [allowances, setAllowances] = useState<Allowance[]>([]); // Existing
+  const [goals, setGoals] = useState<Goal[]>([]); // Existing
 
   const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
@@ -90,33 +90,36 @@ const Analytics = () => {
   const [expenseByBank, setExpenseByBank] = useState<BankData[]>([]);
   const [allowanceByBank, setAllowanceByBank] = useState<BankData[]>([]);
   const [savingsChartData, setSavingsChartData] = useState<{ weekly: SavingsDataPoint[], monthly: SavingsDataPoint[] }>({ weekly: [], monthly: [] });
-  const [savingsCategoryData, setSavingsCategoryData] = useState<any[]>([]); // For SavingsCategoryChart
+  const [savingsCategoryData, setSavingsCategoryData] = useState<any[]>([]);
 
   const [totalSpent, setTotalSpent] = useState(0);
   const [totalIncome, setTotalIncome] = useState(0);
   const [netSavings, setNetSavings] = useState(0);
   const [avgDailySpend, setAvgDailySpend] = useState(0);
 
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  const [analyticsExportData, setAnalyticsExportData] = useState<AnalyticsExportableData | null>(null);
+  const [showExportDialog, setShowExportDialog] = useState(false); // Existing
+  const [analyticsExportData, setAnalyticsExportData] = useState<AnalyticsExportableData | null>(null); // Existing
 
-  const generateRandomColor = () => `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+  const generateRandomColor = () => `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`; // Existing
 
   const fetchData = useCallback(async () => {
     if (!user?.$id) return;
-    setLoading(true);
+    setLoading(true); // For main analytics data
     setError(null);
     try {
-      const [expensesRes, recurringExpensesRes, allowancesRes, goalsRes] = await Promise.all([
-        databaseService.getExpenses(user.$id, 1000), // Fetch regular expenses
-        databaseService.getRecurringExpenses(user.$id), // Fetch recurring expenses
+      const [expensesRes, recurringExpensesRes, allowancesRes, goalsRes, profileRes] = await Promise.all([
+        databaseService.getExpenses(user.$id, 1000),
+        databaseService.getRecurringExpenses(user.$id),
         databaseService.getAllowances(user.$id),
-        databaseService.getGoals(user.$id)
+        databaseService.getGoals(user.$id),
+        authService.getUserProfile(user.$id) // Fetch user profile
       ]);
       setExpenses((expensesRes.documents as unknown as Expense[]) || []);
       setRecurringExpenses((recurringExpensesRes.documents as unknown as RecurringExpense[]) || []);
       setAllowances((allowancesRes.documents as unknown as Allowance[]) || []);
       setGoals((goalsRes.documents as unknown as Goal[]) || []);
+    
+
     } catch (err: any) {
       console.error("Error fetching analytics data:", err);
       setError("Failed to load analytics data. Please try again.");
@@ -158,6 +161,7 @@ const Analytics = () => {
     return { start, end, label };
   }, [timeFilter]);
 
+  // Define processedRecurringInstances first
   const processedRecurringInstances = useMemo(() => {
     const instances: Expense[] = [];
     const { start: intervalStart, end: intervalEnd } = dateInterval;
@@ -190,7 +194,7 @@ const Analytics = () => {
           paymentApp: re.paymentMethod, // Map from RecurringExpense.paymentMethod
           notes: re.notes || `Recurring schedule: ${re.frequency}`,
           isRecurringInstance: true,
-          currency: 'INR',
+          currency: 'INR', // Assuming INR or get from re.currency if available
           $createdAt: currentPaymentDate.toISOString(),
           $updatedAt: currentPaymentDate.toISOString(),
         } as Expense);
@@ -200,20 +204,32 @@ const Analytics = () => {
         else if (re.frequency === 'weekly') { currentPaymentDate = addWeeks(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
-        if (!advanced) break;
+        
+        if (!advanced || !isValid(currentPaymentDate)) break;
       }
     });
     return instances;
   }, [recurringExpenses, dateInterval]);
 
+  // Now define combinedExpensesForFilterPeriod, which depends on processedRecurringInstances
   const combinedExpensesForFilterPeriod = useMemo(() => {
     const { start: intervalStart, end: intervalEnd } = dateInterval;
     const filteredRegularExpenses = expenses.filter(exp => {
       const expDate = parseISO(exp.date);
       return isValid(expDate) && isWithinInterval(expDate, { start: intervalStart, end: intervalEnd });
     });
-    return [...filteredRegularExpenses, ...processedRecurringInstances];
+    return [...filteredRegularExpenses, ...processedRecurringInstances].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
   }, [expenses, processedRecurringInstances, dateInterval]);
+
+  const filteredAllowancesForPeriod = useMemo(() => {
+    const { start: startDate, end: endDate } = dateInterval;
+    return allowances.filter(allow => {
+      const allowDateStr = allow.nextReceived || allow.$createdAt; // Use nextReceived first, fallback to createdAt
+      if (!allowDateStr) return false;
+      const allowDate = parseISO(allowDateStr);
+      return isValid(allowDate) && isWithinInterval(allowDate, { start: startDate, end: endDate });
+    });
+  }, [allowances, dateInterval]);
 
 
   useEffect(() => {
@@ -232,12 +248,13 @@ const Analytics = () => {
     // Use combinedExpensesForFilterPeriod directly as it's already filtered for the period
     const currentFilteredExpenses = combinedExpensesForFilterPeriod;
     
-    const currentFilteredAllowances = allowances.filter(allow => {
-      const allowDateStr = allow.nextReceived || allow.$createdAt; // Use nextReceived first, fallback to createdAt
-      if (!allowDateStr) return false;
-      const allowDate = parseISO(allowDateStr);
-      return isValid(allowDate) && isWithinInterval(allowDate, { start: startDate, end: endDate });
-    });
+    const currentFilteredAllowances = filteredAllowancesForPeriod;
+    // const currentFilteredAllowances = allowances.filter(allow => {
+    //   const allowDateStr = allow.nextReceived || allow.$createdAt; // Use nextReceived first, fallback to createdAt
+    //   if (!allowDateStr) return false;
+    //   const allowDate = parseISO(allowDateStr);
+    //   return isValid(allowDate) && isWithinInterval(allowDate, { start: startDate, end: endDate });
+    // });
 
     // Monthly Trends (Expenses, Income, Savings)
     const trends: { [key: string]: { expenses: number, income: number } } = {};
@@ -253,22 +270,22 @@ const Analytics = () => {
         trendDateFormat = 'MMM dd';
     } else if (daysInInterval <= 93) { // Weekly for up to ~3 months
         trendPeriods = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
-        trendDateFormat = "MMM dd'W'";
+        trendDateFormat = 'MMM dd'; // Week starting
     } else { // Monthly for longer
         trendPeriods = eachMonthOfInterval({ start: startDate, end: endDate });
         trendDateFormat = monthYearFormat;
     }
-
+    
     trendPeriods.forEach(periodStart => {
         const periodLabel = format(periodStart, trendDateFormat);
-        trends[periodLabel] = trends[periodLabel] || { expenses: 0, income: 0 };
+        trends[periodLabel] = { expenses: 0, income: 0 };
     });
     
     currentFilteredExpenses.forEach(exp => {
       const expDate = parseISO(exp.date);
       if(!isValid(expDate)) return;
       let periodLabelToUpdate: string | null = null;
-      for (const periodStart of trendPeriods.slice().reverse()) {
+      for (const periodStart of trendPeriods.slice().reverse()) { // Iterate backwards to find the correct period
           let periodEndCheck: Date;
           if (daysInInterval <= 31) periodEndCheck = endOfDay(periodStart);
           else if (daysInInterval <= 93) periodEndCheck = endOfWeek(periodStart, { weekStartsOn: 1 });
@@ -422,19 +439,20 @@ const Analytics = () => {
       ],
       monthlyTrends: newMonthlyTrends,
       categorySpending: newCategorySpending,
-      dailySpending: newDailySpending, // Ensure this is the one with fullDate for export
+      dailySpending: newDailySpending,
       expenseByBank: newExpenseByBank,
       allowanceByBank: newAllowanceByBank,
-      allExpenses: currentFilteredExpenses, // Export combined and filtered expenses
+      allExpenses: currentFilteredExpenses,
       timeFilterLabel: timeFilterLabel,
     });
 
-    setLoading(false);
+    setLoading(false); // Main analytics data loaded
 
-  }, [combinedExpensesForFilterPeriod, allowances, goals, timeFilter, user, dateInterval, expenses, recurringExpenses, loading]); // Added expenses, recurringExpenses, loading to dep array
+  }, [combinedExpensesForFilterPeriod, filteredAllowancesForPeriod, dateInterval, user, expenses, recurringExpenses, allowances, loading]); // Dependencies for recalculating analytics
 
 
-  if (loading && !analyticsExportData) { // Show loader if still loading and no data has been processed yet
+
+  if (loading && !analyticsExportData) { // Main page loader
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <div className="text-center">
@@ -445,7 +463,7 @@ const Analytics = () => {
     );
   }
 
-  if (error) {
+  if (error) { // Main page error
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
         <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
@@ -458,6 +476,7 @@ const Analytics = () => {
   
   return (
     <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+      {/* Header and Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Analytics</h1>
@@ -465,7 +484,7 @@ const Analytics = () => {
         </div>
         <div className="flex gap-2">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
-            <SelectTrigger className="w-40 dark:text-foreground"> {/* Added dark:text-foreground */}
+            <SelectTrigger className="w-40 dark:text-foreground">
               <SelectValue placeholder="Time period" />
             </SelectTrigger>
             <SelectContent>
@@ -479,8 +498,8 @@ const Analytics = () => {
             variant="outline" 
             size="sm" 
             onClick={() => setShowExportDialog(true)} 
-            disabled={!analyticsExportData}
-            className="dark:text-foreground" /* Added dark:text-foreground */
+            disabled={!analyticsExportData || loading}
+            className="dark:text-foreground"
           >
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -488,6 +507,7 @@ const Analytics = () => {
         </div>
       </div>
 
+      {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {[
           { label: 'Total Spent', value: `₹${totalSpent.toLocaleString()}`, description: `For selected period` },
@@ -505,12 +525,11 @@ const Analytics = () => {
         ))}
       </div>
 
+      {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Expenses by Bank</CardTitle>
-          </CardHeader>
-          <CardContent id="analyticsChartExpensesByBank"> {/* ID for chart capture */}
+          <CardHeader><CardTitle className="text-lg">Expenses by Bank</CardTitle></CardHeader>
+          <CardContent id="analyticsChartExpensesByBank">
             {expenseByBank.length > 0 ? <BankChart data={expenseByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank expense data.</p>}
             {expenseByBank.length > 0 && (
               <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
@@ -529,10 +548,8 @@ const Analytics = () => {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Allowance by Bank</CardTitle>
-          </CardHeader>
-          <CardContent id="analyticsChartAllowanceByBank"> {/* ID for chart capture */}
+          <CardHeader><CardTitle className="text-lg">Allowance by Bank</CardTitle></CardHeader>
+          <CardContent id="analyticsChartAllowanceByBank">
             {allowanceByBank.length > 0 ? <BankChart data={allowanceByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank allowance data.</p>}
              {allowanceByBank.length > 0 && (
                 <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
@@ -551,12 +568,11 @@ const Analytics = () => {
         </Card>
         
         <Card className="xl:col-span-2">
-          <CardContent className="p-0" id="analyticsChartSavingsTracking"> {/* ID for chart capture */}
+          <CardContent className="p-0" id="analyticsChartSavingsTracking">
             <SavingsTrackingChart weeklyData={savingsChartData.weekly} monthlyData={savingsChartData.monthly} />
           </CardContent>
         </Card>
-
-        <Card className="xl:col-span-2">
+<Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg">Financial Trends Over Time</CardTitle>
           </CardHeader>
@@ -589,33 +605,16 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Spending by Category Over Time</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6" id="analyticsChartSpendingByCategory"> {/* ID for chart capture */}
-            {savingsCategoryData.length > 0 && categorySpending.length > 0 ? (
+         <Card className="xl:col-span-2">
+          <CardHeader><CardTitle className="text-lg">Spending by Category</CardTitle></CardHeader>
+          <CardContent className="p-6" id="analyticsChartSpendingByCategory">
+            {categorySpending.length > 0 ? (
+                 // Assuming SavingsCategoryChart can take categorySpending directly or adapt it
                 <SavingsCategoryChart data={savingsCategoryData} categories={categorySpending.map(c => c.category.toLowerCase().replace(/\s+/g, ''))} />
             ) : <p className="text-muted-foreground text-center py-8">No category spending data.</p>}
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" /> AI Insights & Recommendations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">💡 Spending Pattern Analysis</h4>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              AI insights are being developed. Check back soon for personalized recommendations!
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
       <AnalyticsExportDialog
         open={showExportDialog}

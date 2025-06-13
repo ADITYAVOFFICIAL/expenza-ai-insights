@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
 import { toast } from '@/hooks/use-toast';
 import ExpenseForm from '@/components/ExpenseForm';
 import { Expense } from '@/types/expense';
@@ -156,11 +156,27 @@ const AddExpense = () => {
         </CardHeader>
         <CardContent>
           <ExpenseForm 
+            formId="add-expense-form" // Added a formId
             onSubmit={handleSubmit} 
             isLoading={isLoading} 
-            bankSuggestions={bankSuggestions} // Pass the new prop
+            bankSuggestions={bankSuggestions} 
           />
         </CardContent>
+        <CardFooter className="flex justify-end">
+          <Button type="submit" form="add-expense-form" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Plus className="w-4 h-4 mr-2 animate-spin" /> {/* Or a spinner icon */}
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Expense
+              </>
+            )}
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );
