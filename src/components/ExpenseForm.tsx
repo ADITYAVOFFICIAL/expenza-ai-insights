@@ -360,11 +360,11 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
                   <CommandInput 
                     placeholder="Search bank or type new..."
                     value={formData.bank} // Controlled input
-                    onValueChange={(searchValue) => updateFormData('bank', searchValue)} // Update formData as user types
-                  />
-                  <CommandList>
-                    <CommandEmpty>
-                      {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
+                    onValueChange={(searchValue) => updateFormData('bank', searchValue)}
+                />
+                <CommandList className="max-h-[250px] overflow-y-auto"> {/* Ensure these classes */}
+                  <CommandEmpty>
+                    {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
                     </CommandEmpty>
                     <CommandGroup>
                       {bankSuggestions.map((suggestion) => (

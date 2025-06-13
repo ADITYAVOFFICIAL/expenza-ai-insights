@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design system optimized for Expenza - Splitwise-like experience */
-
 @layer base {
   :root {
     --background: 220 20% 98%;
