@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BookOpenText, AlertTriangle, Repeat, Search, Filter as FilterIcon, XCircle, PlusCircle } from 'lucide-react';
+import { BookOpenText, AlertTriangle, Repeat, Search, Filter as FilterIcon, XCircle, PlusCircle, FilterX } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, GenericDocData, COLLECTIONS } from '@/lib/appwrite'; // Added COLLECTIONS

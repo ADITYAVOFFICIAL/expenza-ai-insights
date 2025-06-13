@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Allowance, AllowanceData } from '@/lib/allowanceService';
+import { Allowance, AllowanceData as LibAllowanceData } from '@/lib/allowanceService';
 import { format, parseISO, isValid } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -19,6 +19,11 @@ import { useIsMobile } from '@/hooks/use-mobile'; // Import useIsMobile
 interface BankOption {
   name: string;
   icon?: string;
+}
+
+// Extend LibAllowanceData to include 'daily' frequency
+interface AllowanceData extends Omit<LibAllowanceData, 'frequency'> {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
 interface AllowanceManagerProps {

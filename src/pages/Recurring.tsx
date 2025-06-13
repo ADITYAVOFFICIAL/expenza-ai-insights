@@ -358,16 +358,11 @@ const Recurring = () => {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="utilities">Utilities</SelectItem>
-                <SelectItem value="entertainment">Entertainment</SelectItem>
-                <SelectItem value="investments">Investments</SelectItem>
-                <SelectItem value="health">Health</SelectItem>
-                <SelectItem value="housing">Housing</SelectItem>
-                <SelectItem value="insurance">Insurance</SelectItem>
-                <SelectItem value="transport">Transport</SelectItem>
-                <SelectItem value="loan">Loan</SelectItem>
-                <SelectItem value="subscription">Subscription</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                {categoriesData.map(category => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

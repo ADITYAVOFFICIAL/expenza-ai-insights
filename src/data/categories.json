@@ -6,13 +6,19 @@
     "icon": "utensils",
     "color": "#f97316"
   },
-  {
-    "id": "transport",
-    "name": "Transportation",
-    "icon": "car",
-    "color": "#3b82f6"
+   {
+    "id": "investments",
+    "name": "Investments",
+    "icon": "TrendingUp",
+    "color": "#14b8a6"
   },
   {
+    "id": "xbox",
+    "name": "Xbox/Gaming",
+    "icon": "Gamepad2",
+    "color": "#a3e635"
+  },
+    {
     "id": "shopping",
     "name": "Shopping",
     "icon": "shopping-bag",
@@ -23,6 +29,18 @@
     "name": "Entertainment",
     "icon": "film",
     "color": "#8b5cf6"
+  },
+  {
+    "id": "subscriptions",
+    "name": "Subscriptions",
+    "icon": "credit-card",
+    "color": "#facc15"
+  },
+  {
+    "id": "transport",
+    "name": "Transportation",
+    "icon": "car",
+    "color": "#3b82f6"
   },
   {
     "id": "bills",
@@ -49,7 +67,7 @@
     "color": "#06b6d4"
   },
   {
-    "id": "rent",
+    "id": "rent and housing",
     "name": "Rent & Housing",
     "icon": "home",
     "color": "#84cc16"
