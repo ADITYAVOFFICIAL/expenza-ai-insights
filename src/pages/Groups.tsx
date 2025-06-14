@@ -389,7 +389,7 @@ const Groups = () => {
             setCurrentEditingGroupId(null);
           }
       }}>
-        <DialogContent>
+        <DialogContent className='dark:text-foreground'>
           <DialogHeader><DialogTitle>{isEditingGroup ? 'Edit' : 'Create New'} Group</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div>

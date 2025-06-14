@@ -102,14 +102,18 @@ const Dashboard = () => {
 
       // Activity Feed (simple: last 3 actual expenses as activities)
       setActivityFeedItems(
-        fetchedExpenses.slice(0, 3).map(exp => ({
-          id: exp.$id!,
-          type: 'expense_added',
-          description: `Expense added: ${exp.name} (₹${exp.amount.toLocaleString()})`,
-          timestamp: exp.$createdAt || new Date().toISOString(),
-          user: 'You',
-        }))
-      );
+  fetchedExpenses.slice(0, 3).map(exp => ({
+    id: exp.$id!,
+    type: 'expense_added',
+    description: `Expense added: ${exp.name} (₹${exp.amount.toLocaleString()})`,
+    timestamp: exp.$createdAt || new Date().toISOString(),
+    user: user?.name || 'You',
+    userId: user?.$id, // Add the current user's ID
+    avatarId: (user as any)?.avatarUrl && typeof (user as any).avatarUrl === 'string' && !(user as any).avatarUrl.startsWith('http') 
+      ? (user as any).avatarUrl 
+      : undefined, // Include avatar ID if it's a storage ID
+  }))
+);
 
       // Quick Stats & Monthly Calculations
       const now = new Date();

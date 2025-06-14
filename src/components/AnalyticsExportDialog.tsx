@@ -12,6 +12,7 @@ import { Goal } from '@/types/goal'; // Assuming Goal type is imported
 import { toast } from '@/hooks/use-toast'; // Changed useToast to toast
 import { useIsMobile } from '@/hooks/use-mobile';
 import { format, parseISO } from 'date-fns'; // Added parseISO and format
+
 // Data structure interfaces (assuming these are consistent with Analytics.tsx)
 interface MonthlyTrend {
   month: string;

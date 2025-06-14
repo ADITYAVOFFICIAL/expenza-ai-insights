@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Edit, Trash2, Landmark, CreditCard, Repeat, Briefcase, FileText } from 'lucide-react';
+import { Edit, Trash2, Landmark, CreditCard, Repeat, Briefcase, FileText, ExternalLink } from 'lucide-react'; // Added ExternalLink
 import * as LucideIcons from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Expense } from '@/types/expense'; // Ensure this path and type are correct
-import { cn } from '@/lib/utils'; // Ensure this path is correct
-import paymentAppsData from '@/data/paymentApps.json'; // Ensure this path is correct
-import banksData from '@/data/banks.json'; // Ensure this path is correct
-import categoriesData from '@/data/categories.json'; // Ensure this path is correct
-import { storageService } from '@/lib/appwrite'; // Ensure this path and service are correct
-import { toast } from '@/hooks/use-toast'; // Ensure this path and hook are correct
+import { Expense } from '@/types/expense';
+import { cn } from '@/lib/utils';
+import paymentAppsData from '@/data/paymentApps.json';
+import banksData from '@/data/banks.json';
+import categoriesData from '@/data/categories.json';
+import { storageService } from '@/lib/appwrite';
+import { toast } from '@/hooks/use-toast';
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -31,24 +31,30 @@ const getCategoryDetails = (categoryId: string | undefined) => {
 
   const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase());
   if (!category) {
+    // Try to find by name if ID match fails (for legacy or display name cases)
+    const categoryByName = categoriesData.find(cat => cat.name.toLowerCase() === categoryId.toLowerCase());
+    if (categoryByName) {
+        const IconComp = (LucideIcons as unknown)[categoryByName.icon] || defaultIcon;
+        return { IconComponent: IconComp, color: categoryByName.color || defaultColor, name: categoryByName.name };
+    }
     return { IconComponent: defaultIcon, color: defaultColor, name: categoryId };
   }
 
-  const IconComponent = (LucideIcons as any)[category.icon] || defaultIcon;
+  const IconComponent = (LucideIcons as unknown)[category.icon] || defaultIcon;
   return { IconComponent, color: category.color || defaultColor, name: category.name };
 };
 
 const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) => {
   const { IconComponent: CategoryIcon, color: categoryColor, name: categoryName } = getCategoryDetails(expense.category);
   
-  const paymentIdentifier = expense.paymentMethod || (expense as any).paymentApp; // Handle potential legacy field
+  const paymentIdentifier = expense.paymentMethod || (expense as any).paymentApp;
   const paymentAppDetail = paymentIdentifier ? paymentAppsData.find(app => 
     app.id.toLowerCase() === paymentIdentifier.toLowerCase() || 
     app.name.toLowerCase() === paymentIdentifier.toLowerCase()
   ) : undefined;
 
   const bankDetail = expense.bank ? banksData.find(bank => 
-    bank.id.toLowerCase() === expense.bank!.toLowerCase() || // Assuming bank might be stored as ID
+    bank.id.toLowerCase() === expense.bank!.toLowerCase() ||
     bank.name.toLowerCase() === expense.bank!.toLowerCase()
   ) : undefined;
 
@@ -73,42 +79,33 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
 
   const handleViewBillClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setImageError(null); // Reset previous errors
+    setImageError(null);
     if (expense.billImage) {
       try {
         const resultFromService = storageService.getFileView(expense.billImage);
         let imageUrl: string | null = null;
 
         if (typeof resultFromService === 'string' && resultFromService) {
-          // Case 1: storageService.getFileView returns a string URL directly
           imageUrl = resultFromService;
-          console.log("File view URL (string) from storageService:", imageUrl);
         } else if (resultFromService && typeof (resultFromService as any).href === 'string' && (resultFromService as any).href) {
-          // Case 2: storageService.getFileView returns an object with an href property (e.g., URL object)
           imageUrl = (resultFromService as any).href;
-          console.log("File view URL (from href) from storageService:", imageUrl);
         }
 
         if (imageUrl) {
           setBillImageUrl(imageUrl);
           setShowBillModal(true);
         } else {
-          console.error(
-            "Failed to get a valid image URL. Received:", resultFromService, 
-            "Type:", typeof resultFromService
-          );
-          toast({ title: "Error", description: "Could not generate bill image URL. The URL was invalid or empty.", variant: "destructive" });
+          toast({ title: "Error", description: "Could not generate bill image URL.", variant: "destructive" });
           setBillImageUrl(null);
         }
       } catch (error: any) {
-        console.error("Error in handleViewBillClick (e.g., from storageService.getFileView or processing its result):", error);
-        let description = "Could not load bill image. Check console for details.";
+        let description = "Could not load bill image.";
         if (error.message && error.message.includes("plan")) {
-            description = "Could not load bill image due to plan restrictions or file access issues. Try viewing the original file.";
-        } else if (error.code === 404) { // Appwrite might throw an error with a code for not found
-            description = "Bill image not found. It might have been deleted or the ID is incorrect.";
-        } else if (error.name === 'AppwriteException' && error.code === 401) { // Unauthorized or permissions issue
-            description = "You do not have permission to view this file. Please check file permissions in Appwrite Storage.";
+            description = "Could not load bill image due to plan restrictions or file access issues.";
+        } else if (error.code === 404) {
+            description = "Bill image not found.";
+        } else if (error.name === 'AppwriteException' && error.code === 401) {
+            description = "You do not have permission to view this file.";
         }
         toast({ title: "Error Loading Bill", description, variant: "destructive" });
         setBillImageUrl(null);
@@ -117,139 +114,155 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
       toast({ title: "No Bill Image", description: "There is no bill image associated with this expense.", variant: "info" });
     }
   };
+
+  const canEdit = onEdit && !expense.isRecurringInstance;
+  const canDelete = onDelete && !expense.isRecurringInstance;
+  const canViewBill = expense.billImage && !expense.isRecurringInstance;
+  const showActionBar = canViewBill || canEdit || canDelete;
+
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200 group bg-card text-card-foreground">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
-          {/* Left Section: Icon, Name, Date */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-shrink min-w-0">
+    <Card className="hover:shadow-md transition-shadow duration-200 group bg-card text-card-foreground overflow-hidden">
+      <CardContent className="p-4">
+        {/* Top Section: Main Info */}
+        <div className="flex justify-between items-start gap-3">
+          {/* Left: Icon, Name, Category */}
+          <div className="flex items-center gap-3 flex-grow min-w-0">
             <div 
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${categoryColor}1A` /* For semi-transparent background */ }}
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: `${categoryColor}20` /* Softer background */ }}
             >
               <CategoryIcon 
-                className="w-4 h-4 sm:w-5 sm:h-5" 
+                className="w-5 h-5 sm:w-6 sm:h-6" 
                 style={{ color: categoryColor }}
                 aria-label={`${categoryName} category icon`}
               />
             </div>
             <div className="flex-grow min-w-0">
-              <h4 className="font-semibold text-sm sm:text-base text-foreground truncate" title={expense.name}>
+              <h4 className="font-semibold text-md text-foreground truncate" title={expense.name}>
                 {expense.name}
               </h4>
-              <div className="text-xs sm:text-sm text-muted-foreground flex items-center">
-                <span>{expense.date ? format(parseISO(expense.date), 'MMM dd, yyyy') : 'N/A'}</span>
-                {(expense.isRecurring || expense.isRecurringInstance) && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="ml-1.5 cursor-default flex items-center">
-                        <Repeat className="w-3.5 h-3.5 text-primary" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Recurring Expense</p></TooltipContent>
-                  </Tooltip>
-                )}
-                {expense.billImage && !expense.isRecurringInstance && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-5 w-5 ml-1.5" onClick={handleViewBillClick} aria-label="View bill">
-                        <FileText className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>View Bill</p></TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground capitalize">
+                {categoryName}
+              </p>
             </div>
           </div>
-
-          {/* Right Section: Amount, Payment Details, Actions */}
-          <div className="text-right flex flex-col items-end flex-shrink-0 pl-2">
-            <div className={`text-base sm:text-lg font-bold ${expense.amount >= 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
+          {/* Right: Amount, Date */}
+          <div className="text-right flex-shrink-0">
+            <div className={`text-md font-bold ${expense.amount >= 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
               ₹{Math.abs(expense.amount).toLocaleString()}
             </div>
-            
-            <div className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
-              {paymentIdentifier && (
-                <div className="flex items-center justify-end gap-1" title={paymentAppDetail?.name || paymentIdentifier}>
-                  {paymentAppDetail?.icon ? (
-                    <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-3 h-3 sm:w-4 sm:h-4 object-contain rounded" />
-                  ) : (
-                    <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                  )}
-                  <span className="truncate max-w-[80px] sm:max-w-[100px]">{paymentAppDetail?.name || paymentIdentifier}</span>
-                </div>
-              )}
-              {expense.bank && (
-                <div className="flex items-center justify-end gap-1" title={bankDetail?.name || expense.bank}>
-                  {bankDetail?.icon ? (
-                    <img src={bankDetail.icon} alt={bankDetail.name} className="w-3 h-3 sm:w-4 sm:h-4 object-contain rounded" />
-                  ) : (
-                    <Landmark className="w-3 h-3 sm:w-4 sm:h-4 shrink-0" />
-                  )}
-                  <span className="truncate max-w-[80px] sm:max-w-[100px]">{bankDetail?.name || expense.bank}</span>
-                </div>
-              )}
-            </div>
-            
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {expense.date ? format(parseISO(expense.date), 'MMM dd, yyyy') : 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        {/* Middle Section: Details (Payment, Bank, Badges) */}
+        {(paymentIdentifier || expense.bank || expense.isRecurring || expense.isRecurringInstance || (expense.splitBetween && expense.splitBetween.length > 1)) && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            {paymentIdentifier && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-default">
+                    {paymentAppDetail?.icon ? (
+                      <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-3.5 h-3.5 object-contain rounded" />
+                    ) : (
+                      <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span className="truncate max-w-[100px]">{paymentAppDetail?.name || paymentIdentifier}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent><p>{paymentAppDetail?.name || paymentIdentifier}</p></TooltipContent>
+              </Tooltip>
+            )}
+            {expense.bank && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-default">
+                    {bankDetail?.icon ? (
+                      <img src={bankDetail.icon} alt={bankDetail.name} className="w-3.5 h-3.5 object-contain rounded" />
+                    ) : (
+                      <Landmark className="w-3.5 h-3.5 shrink-0" />
+                    )}
+                    <span className="truncate max-w-[100px]">{bankDetail?.name || expense.bank}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent><p>{bankDetail?.name || expense.bank}</p></TooltipContent>
+              </Tooltip>
+            )}
+            {(expense.isRecurring || expense.isRecurringInstance) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="py-0.5 px-1.5 border-primary/50 text-primary/90 bg-primary/10 cursor-default">
+                    <Repeat className="w-3 h-3 mr-1" /> Recurring
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent><p>This is a recurring expense</p></TooltipContent>
+              </Tooltip>
+            )}
             {expense.splitBetween && expense.splitBetween.length > 1 && (
               <Badge 
                 variant={expense.isSettled ? "default" : "outline"} 
                 className={cn(
-                  "mt-1.5 text-xs py-0.5 px-1.5",
-                  expense.isSettled ? "bg-green-100 text-green-700 hover:bg-green-200/70 border border-green-200 dark:bg-green-700/20 dark:text-green-300 dark:border-green-600/30" 
-                                    : "border-border" // Default outline styling
+                  "py-0.5 px-1.5 cursor-default",
+                  expense.isSettled ? "bg-green-100 text-green-700 hover:bg-green-200/70 border-green-200 dark:bg-green-700/20 dark:text-green-300 dark:border-green-600/30" 
+                                    : "border-border"
                 )}
               >
                 {expense.isSettled ? "Settled" : `Split ${expense.splitBetween.length} ways`}
               </Badge>
             )}
-
-            {(onEdit || onDelete) && !expense.isRecurringInstance && (
-              <div className="flex gap-1 mt-1 sm:mt-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
-                {onEdit && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={handleEdit} aria-label="Edit expense">
-                        <Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Edit</p></TooltipContent>
-                  </Tooltip>
-                )}
-                {onDelete && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive/90 hover:bg-destructive/10" onClick={handleDelete} aria-label="Delete expense">
-                        <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Delete</p></TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </CardContent>
+
+      {/* Action Bar - Conditionally rendered with a border */}
+      {showActionBar && (
+        <div className="bg-muted/30 dark:bg-muted/10 px-4 py-2 border-t border-border/60 flex justify-end items-center gap-1">
+          {canViewBill && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="default" size="sm" className="gap-1.5" onClick={handleViewBillClick} aria-label="View Bill">
+                  <FileText className="w-4 h-4" />
+                  <span className="text-xs sm:text-sm">View Bill</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>View Bill</p></TooltipContent>
+            </Tooltip>
+          )}
+          {canEdit && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleEdit} aria-label="Edit expense">
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Edit</p></TooltipContent>
+            </Tooltip>
+          )}
+          {canDelete && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10" onClick={handleDelete} aria-label="Delete expense">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Delete</p></TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )}
 
      {showBillModal && billImageUrl && (
         <Dialog open={showBillModal} onOpenChange={setShowBillModal}>
           <DialogContent
             className="w-[95vw] max-w-lg sm:max-w-xl md:max-w-2xl lg:max-w-3xl p-0 border-muted-foreground"
-            // REMOVED explicit aria-describedby to let Radix auto-wire
           >
             <DialogHeader className="p-3 sm:p-4 border-transparent">
               <DialogTitle className="text-base sm:text-lg dark:text-foreground">
-                {/* Ensure expense.name has a fallback if it can be undefined/null */}
                 Bill for {expense.name || 'this item'}
               </DialogTitle>
-              {/*
-                Ensure DialogDescription is rendered and has content.
-                Removed sr-only temporarily for testing; if this works, sr-only can be added back.
-                If sr-only was the issue, the checker might be too aggressive.
-              */}
-              <DialogDescription>
+              <DialogDescription className="sr-only">
                 Viewing the uploaded bill image for {expense.name || 'this item'}.
               </DialogDescription>
             </DialogHeader>
@@ -264,7 +277,7 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
                   onLoad={() => setImageError(null)}
                   onError={(e) => {
                     console.error("Error loading image into <img> tag:", billImageUrl, e);
-                    const specificError = "Could not display the bill image. The file might be corrupted, inaccessible, or not a valid image format. Please also check file permissions in Appwrite Storage.";
+                    const specificError = "Could not display the bill image. The file might be corrupted, inaccessible, or not a valid image format.";
                     setImageError(specificError);
                     toast({ 
                       title: "Image Load Error", 
@@ -278,7 +291,6 @@ const ExpenseCard: React.FC<ExpenseCardProps> = ({ expense, onEdit, onDelete }) 
           </DialogContent>
         </Dialog>
       )}
-
     </Card>
   );
 };

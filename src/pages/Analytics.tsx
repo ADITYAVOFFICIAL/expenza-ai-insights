@@ -13,6 +13,7 @@ import { Expense, RecurringExpense } from '@/types/expense'; // Ensure Recurring
 import { Allowance } from '@/lib/allowanceService';
 import { Goal } from '@/types/goal';
 import { toast } from '@/hooks/use-toast';
+import FinancialTrendsChart from '@/components/charts/FinancialTrendsChart'; // Ensure this import is present
 import { 
   format, 
   parseISO, 
@@ -84,7 +85,7 @@ const Analytics = () => {
   const [allowances, setAllowances] = useState<Allowance[]>([]); // Existing
   const [goals, setGoals] = useState<Goal[]>([]); // Existing
 
-  const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
+  const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]); // Ensure this state exists
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
   const [dailySpending, setDailySpending] = useState<DailySpending[]>([]);
   const [expenseByBank, setExpenseByBank] = useState<BankData[]>([]);
@@ -452,7 +453,7 @@ const Analytics = () => {
 
 
 
-  if (loading && !analyticsExportData) { // Main page loader
+  if (loading && monthlyTrends.length === 0) { // Adjusted loading condition
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <div className="text-center">
@@ -463,7 +464,7 @@ const Analytics = () => {
     );
   }
 
-  if (error) { // Main page error
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
         <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
@@ -473,7 +474,7 @@ const Analytics = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
       {/* Header and Filters */}
@@ -527,9 +528,10 @@ const Analytics = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
+        {/* Expenses by Bank Chart */}
         <Card>
           <CardHeader><CardTitle className="text-lg">Expenses by Bank</CardTitle></CardHeader>
-          <CardContent id="analyticsChartExpensesByBank">
+          <CardContent id="analyticsChartExpensesByBank"> {/* ID for export */}
             {expenseByBank.length > 0 ? <BankChart data={expenseByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank expense data.</p>}
             {expenseByBank.length > 0 && (
               <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
@@ -547,9 +549,10 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
+        {/* Allowance by Bank Chart */}
         <Card>
           <CardHeader><CardTitle className="text-lg">Allowance by Bank</CardTitle></CardHeader>
-          <CardContent id="analyticsChartAllowanceByBank">
+          <CardContent id="analyticsChartAllowanceByBank"> {/* ID for export */}
             {allowanceByBank.length > 0 ? <BankChart data={allowanceByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank allowance data.</p>}
              {allowanceByBank.length > 0 && (
                 <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
@@ -567,51 +570,38 @@ const Analytics = () => {
           </CardContent>
         </Card>
         
+        {/* === THIS IS THE CORRECTED FINANCIAL TRENDS CHART === */}
+        {/* The ID for export should be inside FinancialTrendsChart or on a div wrapping its chart area */}
+        {/* The FinancialTrendsChart component renders its own Card, so no need to wrap CardContent with p-0 if FinancialTrendsChart handles its own padding. */}
+        {/* If FinancialTrendsChart has its own Card, you might not need to wrap it in another Card unless for layout (xl:col-span-2) */}
+        <div className="xl:col-span-2" id="analyticsChartFinancialTrendsWrapper"> {/* Wrapper for layout and potential export ID */}
+            <FinancialTrendsChart data={monthlyTrends} />
+        </div>
+        {/* === REMOVE THE OLD FINANCIAL TRENDS CHART THAT WAS HERE === */}
+        {/* 
+          The old card structure that was here:
+          <Card className="xl:col-span-2">
+            <CardHeader>...</CardHeader>
+            <CardContent id="analyticsChartFinancialTrends">...</CardContent>
+          </Card>
+          SHOULD BE COMPLETELY REMOVED.
+        */}
+{/* Savings Tracking Chart */}
         <Card className="xl:col-span-2">
-          <CardContent className="p-0" id="analyticsChartSavingsTracking">
+          {/* The ID for export should be inside SavingsTrackingChart or on a div wrapping its chart area */}
+          <CardContent className="p-0" id="analyticsChartSavingsTrackingWrapper"> 
             <SavingsTrackingChart weeklyData={savingsChartData.weekly} monthlyData={savingsChartData.monthly} />
           </CardContent>
         </Card>
-<Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Financial Trends Over Time</CardTitle>
-          </CardHeader>
-          <CardContent id="analyticsChartFinancialTrends"> {/* ID for chart capture */}
-            {monthlyTrends.length > 0 ? (
-              <div id="analyticsChartFinancialTrends"> {/* ID for capturing */}
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={monthlyTrends}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip
-                      formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name.charAt(0).toUpperCase() + name.slice(1)]}
-                      labelStyle={{color: 'hsl(var(--foreground))'}}
-                      contentStyle={{
-                      backgroundColor: 'hsl(var(--background))', 
-                      border: '1px solid hsl(var(--border))', 
-                      borderRadius: 'var(--radius)',
-                      color: 'hsl(var(--foreground))',
-                  }}
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="income" stroke="#3b82f6" name="Income" />
-                    <Line type="monotone" dataKey="expenses" stroke="#ef4444" name="Expenses" />
-                    <Line type="monotone" dataKey="savings" stroke="#22c55e" name="Savings" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : <p className="text-muted-foreground text-center py-8">No trend data available.</p>}
-          </CardContent>
-        </Card>
 
-         <Card className="xl:col-span-2">
-          <CardHeader><CardTitle className="text-lg">Spending by Category</CardTitle></CardHeader>
-          <CardContent className="p-6" id="analyticsChartSpendingByCategory">
-            {categorySpending.length > 0 ? (
-                 // Assuming SavingsCategoryChart can take categorySpending directly or adapt it
+        {/* Spending by Category Chart */}
+        <Card className="xl:col-span-2">
+          <CardHeader><CardTitle className="text-lg">Spending by Category Over Time</CardTitle></CardHeader>
+          {/* The ID for export should be inside SavingsCategoryChart or on a div wrapping its chart area */}
+          <CardContent className="p-4" id="analyticsChartSpendingByCategoryWrapper"> 
+            {savingsCategoryData.length > 0 && categorySpending.length > 0 ? (
                 <SavingsCategoryChart data={savingsCategoryData} categories={categorySpending.map(c => c.category.toLowerCase().replace(/\s+/g, ''))} />
-            ) : <p className="text-muted-foreground text-center py-8">No category spending data.</p>}
+            ) : <p className="text-muted-foreground text-center py-8">No category spending data for trend chart.</p>}
           </CardContent>
         </Card>
       </div>
@@ -620,6 +610,8 @@ const Analytics = () => {
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         analyticsData={analyticsExportData}
+        // Ensure chartConfigs in AnalyticsExportDialog use IDs like 'financialTrendsChartContainer' (if ID is inside the component)
+        // or 'analyticsChartFinancialTrendsWrapper' if the ID is on the wrapper div.
       />
     </div>
   );

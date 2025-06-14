@@ -41,7 +41,7 @@ const AppContent = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background dark:bg-dark">
         <div className="text-center">
           <div className="relative flex items-center justify-center mb-6">
             {/* Pulsing background circles */}
@@ -52,7 +52,7 @@ const AppContent = () => {
             ></div>
 
             {/* DigiSamahārta Icon */}
-            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl">
+            <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2x">
               <Wallet className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>

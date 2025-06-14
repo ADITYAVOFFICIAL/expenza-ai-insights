@@ -1,12 +1,11 @@
-
 [
   {
     "id": "food",
     "name": "Food & Dining",
-    "icon": "utensils",
+    "icon": "Utensils",
     "color": "#f97316"
   },
-   {
+  {
     "id": "investments",
     "name": "Investments",
     "icon": "TrendingUp",
@@ -18,88 +17,88 @@
     "icon": "Gamepad2",
     "color": "#a3e635"
   },
-    {
+  {
     "id": "shopping",
     "name": "Shopping",
-    "icon": "shopping-bag",
+    "icon": "ShoppingBag",
     "color": "#ec4899"
   },
   {
     "id": "entertainment",
     "name": "Entertainment",
-    "icon": "film",
+    "icon": "Film",
     "color": "#8b5cf6"
   },
   {
     "id": "subscriptions",
     "name": "Subscriptions",
-    "icon": "credit-card",
+    "icon": "CreditCard",
     "color": "#facc15"
   },
   {
     "id": "transport",
     "name": "Transportation",
-    "icon": "car",
+    "icon": "Car",
     "color": "#3b82f6"
   },
   {
     "id": "bills",
     "name": "Bills & Utilities",
-    "icon": "file-text",
+    "icon": "FileText",
     "color": "#ef4444"
   },
   {
     "id": "health",
     "name": "Health & Medical",
-    "icon": "heart",
+    "icon": "Heart",
     "color": "#10b981"
   },
   {
     "id": "education",
     "name": "Education",
-    "icon": "book",
+    "icon": "Book",
     "color": "#6366f1"
   },
   {
     "id": "travel",
     "name": "Travel",
-    "icon": "plane",
+    "icon": "Plane",
     "color": "#06b6d4"
   },
   {
     "id": "rent and housing",
     "name": "Rent & Housing",
-    "icon": "home",
+    "icon": "Home",
     "color": "#84cc16"
   },
   {
     "id": "groceries",
     "name": "Groceries",
-    "icon": "shopping-cart",
+    "icon": "ShoppingCart",
     "color": "#22c55e"
   },
   {
     "id": "fuel",
     "name": "Fuel",
-    "icon": "fuel",
+    "icon": "Fuel",
     "color": "#f59e0b"
   },
   {
     "id": "insurance",
     "name": "Insurance",
-    "icon": "shield",
+    "icon": "Shield",
     "color": "#64748b"
   },
   {
     "id": "gifts",
     "name": "Gifts & Donations",
-    "icon": "gift",
+    "icon": "Gift",
     "color": "#f472b6"
   },
   {
     "id": "other",
     "name": "Other",
-    "icon": "more-horizontal",
+    "icon": "MoreHorizontal",
     "color": "#6b7280"
   }
 ]
