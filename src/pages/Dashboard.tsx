@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, TrendingUp, Users, Calendar, BarChart3, Target, CreditCard, FileText, Shield, AlertTriangle } from 'lucide-react';
+import { Plus, TrendingUp, Users, Calendar, BarChart3, Target, CreditCard, FileText, Shield, AlertTriangle, TrendingDown } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,17 +7,20 @@ import QuickStats, { QuickStatProps } from '@/components/QuickStats';
 import ExpenseCard from '@/components/ExpenseCard';
 import ActivityFeed, { ActivityItem } from '@/components/ActivityFeed';
 import AllowanceManager from '@/components/AllowanceManager';
-import { Expense, RecurringExpense } from '@/types/expense'; // Added RecurringExpense
-import { Allowance, AllowanceData } from '@/lib/allowanceService'; // Ensure AllowanceData is exported or defined
+import { Expense, RecurringExpense } from '@/types/expense';
+import { Allowance, AllowanceData, processPastDueAllowances } from '@/lib/allowanceService';
+import { processPastDueRecurringExpenses } from '@/lib/recurringExpenseService'; // Import the new service
 import { Progress } from '@/components/ui/progress';
-import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
-import { useAuth } from '@/contexts/AuthContext'; // Added this import
-import { databaseService, storageService, COLLECTIONS } from '@/lib/appwrite'; // Added storageService and COLLECTIONS
+import * as LucideIcons from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { databaseService, storageService, COLLECTIONS, GenericDocData } from '@/lib/appwrite';
 import { toast } from '@/hooks/use-toast';
-import { startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
-import { cn } from '@/lib/utils'; // Added this import
-import categoriesData from '@/data/categories.json'; // Import categories data
-import { BarChart, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend as RechartsLegend, PieChart, Pie, Cell } from 'recharts';
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO, isValid, addDays, addWeeks, addMonths, addYears, format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import categoriesData from '@/data/categories.json';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import ExpenseForm from '@/components/ExpenseForm';
+import banksData from '@/data/banks.json';
 
 const quickActions = [
   { icon: Plus, label: 'Add Expense', subtitle: 'Log a new transaction', href: '/add-expense' },
@@ -31,17 +34,11 @@ interface BankSuggestion {
   icon?: string;
 }
 
-// Helper to get category icon component (similar to ExpenseCard)
 const getCategoryIcon = (categoryId: string | undefined) => {
-  const defaultIcon = LucideIcons.Tag; // Default icon if not found
-
-  if (!categoryId) {
-    return defaultIcon;
-  }
+  const defaultIcon = LucideIcons.Tag;
+  if (!categoryId) return defaultIcon;
   const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase() || cat.name.toLowerCase() === categoryId.toLowerCase());
-  if (!category || !category.icon) {
-    return defaultIcon;
-  }
+  if (!category || !category.icon) return defaultIcon;
   return (LucideIcons as any)[category.icon] || defaultIcon;
 };
 
@@ -53,7 +50,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [allowances, setAllowances] = useState<Allowance[]>([]);
-  const [recurringExpensesList, setRecurringExpensesList] = useState<RecurringExpense[]>([]); // New state for recurring expenses
+  const [recurringExpensesList, setRecurringExpensesList] = useState<RecurringExpense[]>([]);
 
   const [quickStatsData, setQuickStatsData] = useState<QuickStatProps[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
@@ -65,27 +62,38 @@ const Dashboard = () => {
   const [bankSuggestionsForEdit, setBankSuggestionsForEdit] = useState<BankSuggestion[]>([]);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
-  const categoryColors: { [key: string]: string } = {
-    food: '#FF6384',
-    transport: '#36A2EB',
-    shopping: '#FFCE56',
-    utilities: '#4BC0C0',
-    entertainment: '#9966FF',
-    health: '#FF9F40',
-    other: '#C9CBCF',
-  };
   const generateRandomColor = () => `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-
 
   const fetchData = useCallback(async () => {
     if (!user?.$id) return;
     setLoading(true);
     setError(null);
     try {
-      const [expensesRes, allowancesRes, recurringExpensesRes] = await Promise.all([
-        databaseService.getExpenses(user.$id, 100), // Fetch more for calculations
+      // Step 1: Fetch templates for processing
+      const [allowancesToProcessRes, recurringToProcessRes] = await Promise.all([
         databaseService.getAllowances(user.$id),
-        databaseService.getRecurringExpenses(user.$id), // Fetch recurring expenses
+        databaseService.getRecurringExpenses(user.$id),
+      ]);
+      
+      const allowancesToProcess = (allowancesToProcessRes.documents as unknown as Allowance[]) || [];
+      const recurringToProcess = (recurringToProcessRes.documents as unknown as RecurringExpense[]) || [];
+      
+      // Step 2: Process both allowances and recurring expenses
+      const allowancesWereProcessed = await processPastDueAllowances(allowancesToProcess, user.$id, user.name);
+      const recurringWereProcessed = await processPastDueRecurringExpenses(recurringToProcess, user.$id, user.name);
+
+      if (allowancesWereProcessed) {
+        toast({ title: "Allowances Updated", description: "Your recurring income has been automatically updated." });
+      }
+      if (recurringWereProcessed) {
+        toast({ title: "Recurring Bills Updated", description: "Your recurring bills have been automatically logged." });
+      }
+
+      // Step 3: Fetch all data again to get the freshest state
+      const [expensesRes, allowancesRes, recurringExpensesRes] = await Promise.all([
+        databaseService.getExpenses(user.$id, 100),
+        databaseService.getAllowances(user.$id),
+        databaseService.getRecurringExpenses(user.$id),
       ]);
 
       const fetchedExpenses = (expensesRes.documents as unknown as Expense[]) || [];
@@ -96,70 +104,21 @@ const Dashboard = () => {
       setAllowances(fetchedAllowances);
       setRecurringExpensesList(fetchedRecurringExpenses);
 
-      // Process data for dashboard
-      // Recent Expenses (last 5 actual expenses)
-      setRecentExpenses(fetchedExpenses.slice(0, 5));
+      // --- All subsequent calculations will now use the up-to-date 'fetchedExpenses' ---
 
-      // Activity Feed (simple: last 3 actual expenses as activities)
-      setActivityFeedItems(
-  fetchedExpenses.slice(0, 3).map(exp => ({
-    id: exp.$id!,
-    type: 'expense_added',
-    description: `Expense added: ${exp.name} (₹${exp.amount.toLocaleString()})`,
-    timestamp: exp.$createdAt || new Date().toISOString(),
-    user: user?.name || 'You',
-    userId: user?.$id, // Add the current user's ID
-    avatarId: (user as any)?.avatarUrl && typeof (user as any).avatarUrl === 'string' && !(user as any).avatarUrl.startsWith('http') 
-      ? (user as any).avatarUrl 
-      : undefined, // Include avatar ID if it's a storage ID
-  }))
-);
-
-      // Quick Stats & Monthly Calculations
       const now = new Date();
       const currentMonthStart = startOfMonth(now);
       const currentMonthEnd = endOfMonth(now);
 
-      // Filter regular expenses for the current month
-      let monthlyExpenses = fetchedExpenses.filter(exp => 
+      const monthlyTransactions = fetchedExpenses.filter(exp => 
         isWithinInterval(parseISO(exp.date), { start: currentMonthStart, end: currentMonthEnd })
       );
 
-      // Process recurring expenses for the current month
-      const dueRecurringExpensesForMonth: Expense[] = fetchedRecurringExpenses
-        .filter(re => 
-          re.isActive && 
-          re.nextDueDate && 
-          isWithinInterval(parseISO(re.nextDueDate), { start: currentMonthStart, end: currentMonthEnd })
-          // Optional: Add logic here to check if it was already "paid" or logged this month if you implement such a feature
-        )
-        .map(re => ({
-          $id: `recurring-${re.$id}-${re.nextDueDate}`, // Create a unique ID for this instance
-          userId: re.userId,
-          name: re.name,
-          amount: re.amount,
-          category: re.category,
-          date: re.nextDueDate, // Use nextDueDate as the date for this month's instance
-          paymentMethod: re.paymentMethod || 'recurring',
-          bank: re.bank,
-          notes: re.notes || `Recurring: ${re.name}`,
-          isRecurring: true, // Mark it as a recurring type for potential differentiation
-          currency: 'INR', // Assuming INR
-          $createdAt: parseISO(re.nextDueDate).toISOString(), // Use due date as creation for this instance
-          $updatedAt: parseISO(re.nextDueDate).toISOString(),
-        }));
+      const monthlyIncomeTransactions = monthlyTransactions.filter(exp => exp.amount < 0);
+      const monthlyExpenseTransactions = monthlyTransactions.filter(exp => exp.amount >= 0);
 
-      // Combine regular and due recurring expenses for monthly calculations
-      const allMonthlyExpenses = [...monthlyExpenses, ...dueRecurringExpensesForMonth];
-
-
-      const monthlyAllowances = fetchedAllowances.filter(allow => {
-        const allowDate = allow.nextReceived ? parseISO(allow.nextReceived) : (allow.$createdAt ? parseISO(allow.$createdAt) : now);
-        return isWithinInterval(allowDate, { start: currentMonthStart, end: currentMonthEnd });
-      });
-
-      const totalSpentMonth = allMonthlyExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-      const totalIncomeMonth = monthlyAllowances.reduce((sum, allow) => sum + allow.amount, 0);
+      const totalSpentMonth = monthlyExpenseTransactions.reduce((sum, exp) => sum + exp.amount, 0);
+      const totalIncomeMonth = monthlyIncomeTransactions.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
       const netSavingsMonth = totalIncomeMonth - totalSpentMonth;
 
       setQuickStatsData([
@@ -168,32 +127,56 @@ const Dashboard = () => {
         { title: 'Net Savings', value: `₹${netSavingsMonth.toLocaleString()}`, change: '', trend: netSavingsMonth > 0 ? 'up' : (netSavingsMonth < 0 ? 'down' : 'neutral'), icon: Shield },
         { title: 'Active Allowances', value: fetchedAllowances.filter(a => a.isActive).length.toString(), change: '', trend: 'neutral', icon: CreditCard },
       ]);
+      
+      setRecentExpenses(fetchedExpenses.filter(e => e.amount >= 0).slice(0, 5));
 
-      // Top Categories This Month (using combined expenses)
+      setActivityFeedItems(
+        fetchedExpenses.slice(0, 5).map(exp => {
+          const isIncome = exp.amount < 0;
+          const description = isIncome 
+            ? `Income received: <b>${exp.name}</b> (₹${Math.abs(exp.amount).toLocaleString()})`
+            : `Expense added: <b>${exp.name}</b> (₹${exp.amount.toLocaleString()})`;
+          const type = isIncome ? 'income_received' : 'expense_added';
+
+          return {
+            id: exp.$id!,
+            type: type,
+            description: description,
+            timestamp: exp.$createdAt || new Date().toISOString(),
+            user: user?.name || 'You',
+            userId: user?.$id,
+            icon: isIncome ? TrendingDown : TrendingUp,
+            avatarId: (user as any)?.avatarUrl && typeof (user as any).avatarUrl === 'string' && !(user as any).avatarUrl.startsWith('http') 
+              ? (user as any).avatarUrl 
+              : undefined,
+          };
+        })
+      );
+      
       const categorySpending: { [key: string]: number } = {};
-      allMonthlyExpenses.forEach(exp => {
+      monthlyExpenseTransactions.forEach(exp => {
         categorySpending[exp.category] = (categorySpending[exp.category] || 0) + exp.amount;
       });
       const totalCategorySpending = Object.values(categorySpending).reduce((sum, val) => sum + val, 0);
       const sortedCategories = Object.entries(categorySpending)
         .sort(([, a], [, b]) => b - a)
-        .slice(0, 5) // Top 5
+        .slice(0, 5)
         .map(([name, amount]) => {
           const categoryDetails = categoriesData.find(c => c.name.toLowerCase() === name.toLowerCase());
           return {
-            id: categoryDetails?.id || name.toLowerCase(), // Ensure you have an ID
+            id: categoryDetails?.id || name.toLowerCase(),
             name,
             amount,
             percentage: totalCategorySpending > 0 ? parseFloat(((amount / totalCategorySpending) * 100).toFixed(1)) : 0,
-            displayColor: categoryDetails?.color || generateRandomColor(), // Use color from categories.json
+            displayColor: categoryDetails?.color || generateRandomColor(),
           };
         });
       setTopCategoriesThisMonth(sortedCategories);
 
-    } catch (err) {
-      // console.error("Error fetching dashboard data:", err);
+    } catch (err: any) {
+      console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data.");
-      toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Could not load dashboard data.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -225,7 +208,6 @@ const Dashboard = () => {
           suggestions.sort((a, b) => a.name.localeCompare(b.name));
           setBankSuggestionsForEdit(suggestions);
         } catch (error) {
-          // console.error("Error fetching bank suggestions for edit:", error);
           toast({ title: "Error", description: "Could not load bank suggestions for editing.", variant: "destructive" });
         }
       }
@@ -239,8 +221,6 @@ const Dashboard = () => {
       navigate('/recurring');
       return;
     }
-    // The ExpenseForm expects initialData.paymentApp for the PaymentMethodSelector
-    // Ensure the expense object passed to initialData has paymentApp if paymentMethod exists
     const expenseToEdit = {
       ...expense,
       paymentApp: expense.paymentMethod || (expense as any).paymentApp
@@ -263,9 +243,9 @@ const Dashboard = () => {
         category: expenseFormData.category!,
         currency: expenseFormData.currency || 'INR',
         notes: expenseFormData.notes || undefined,
-        paymentMethod: (expenseFormData as any).paymentApp || undefined, // form sends paymentApp, save as paymentMethod
+        paymentMethod: (expenseFormData as any).paymentApp || undefined,
         bank: expenseFormData.bank || undefined,
-        billImage: expenseFormData.billImage, // Changed from expenseFormData.billImage || undefined
+        billImage: expenseFormData.billImage,
         isRecurring: expenseFormData.isRecurring || false,
         groupId: expenseFormData.groupId || undefined,
         paidBy: expenseFormData.paidBy || undefined,
@@ -279,7 +259,6 @@ const Dashboard = () => {
       setEditingExpense(null);
       fetchData(); 
     } catch (error: any) {
-      // console.error('Error updating expense:', error);
       toast({ title: "Error Updating Expense", description: error.message || "Failed to update expense. Please try again.", variant: "destructive" });
     } finally {
       setIsSubmittingEdit(false);
@@ -296,26 +275,22 @@ const Dashboard = () => {
 
     if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
       try {
-        // Fetch the expense to get the billImage ID
         const expenseToDelete = await databaseService.getDocument(COLLECTIONS.EXPENSES, expenseId);
         const billImageId = (expenseToDelete as unknown as Expense).billImage;
 
-        await databaseService.deleteExpense(expenseId); // Delete expense document
+        await databaseService.deleteExpense(expenseId);
 
         if (billImageId) {
           try {
-            await storageService.deleteFile(billImageId); // Delete associated bill image
-            // console.log(`Bill image ${billImageId} deleted successfully.`);
+            await storageService.deleteFile(billImageId);
           } catch (fileError) {
-            // console.error("Error deleting bill image:", fileError);
-            // Optionally notify user, but primary deletion was successful
+            console.error("Error deleting bill image:", fileError);
           }
         }
 
         toast({ title: "Expense Deleted", description: "The expense has been successfully deleted." });
-        fetchData(); // Refresh data
+        fetchData();
       } catch (error) {
-        // console.error("Error deleting expense:", error);
         toast({ title: "Error", description: "Could not delete the expense.", variant: "destructive" });
       }
     }
@@ -326,9 +301,8 @@ const Dashboard = () => {
     try {
       await databaseService.createAllowance({ ...allowanceData, userId: user.$id });
       toast({ title: "Allowance Added", description: "New allowance has been successfully added." });
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
-      // console.error("Error adding allowance:", error);
       toast({ title: "Error", description: "Could not add the allowance.", variant: "destructive" });
     }
   };
@@ -338,9 +312,8 @@ const Dashboard = () => {
     try {
       await databaseService.updateAllowance(allowanceId, { ...allowanceData, userId: user.$id });
       toast({ title: "Allowance Updated", description: "Allowance has been successfully updated." });
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
-      // console.error("Error updating allowance:", error);
       toast({ title: "Error", description: "Could not update the allowance.", variant: "destructive" });
     }
   };
@@ -350,15 +323,13 @@ const Dashboard = () => {
     try {
       await databaseService.deleteAllowance(allowanceId);
       toast({ title: "Allowance Deleted", description: "Allowance has been successfully deleted." });
-      fetchData(); // Refresh data
+      fetchData();
     } catch (error) {
-      // console.error("Error deleting allowance:", error);
       toast({ title: "Error", description: "Could not delete the allowance.", variant: "destructive" });
     }
   };
 
-
-  if (loading && expenses.length === 0 && recurringExpensesList.length === 0) { // Show full page loader only on initial load
+  if (loading && expenses.length === 0 && recurringExpensesList.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <div className="text-center">
@@ -382,7 +353,6 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 p-4 lg:p-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Welcome back, {user?.name || 'User'}!</h1>
@@ -396,10 +366,8 @@ const Dashboard = () => {
         </Link>
       </div>
 
-      {/* Quick Stats */}
       <QuickStats stats={quickStatsData} />
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-4">
         {quickActions.map((action) => (
           <Link key={action.label} to={action.href}>
@@ -419,13 +387,12 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Expenses */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-foreground">Recent Expenses</h2>
             <Link 
-              to="/analytics"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "dark:text-foreground")} // Added dark:text-foreground
+              to="/passbook"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "dark:text-foreground")}
             >
               View All
             </Link>
@@ -448,14 +415,12 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Activity Feed */}
         <div className="lg:col-span-1">
           <ActivityFeed items={activityFeedItems} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Allowance Management */}
         <div className="lg:col-span-1">
           <AllowanceManager
             allowances={allowances}
@@ -465,7 +430,6 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Category Insights */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -473,7 +437,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {topCategoriesThisMonth.length > 0 ? topCategoriesThisMonth.map((category) => {
-                const CategoryIcon = getCategoryIcon(category.id); // Use category.id
+                const CategoryIcon = getCategoryIcon(category.id);
                 return (
                   <div key={category.name}>
                     <div className="flex justify-between items-center mb-1">
@@ -486,7 +450,7 @@ const Dashboard = () => {
                       </div>
                       <span className="text-sm text-muted-foreground">₹{category.amount.toLocaleString()}</span>
                     </div>
-                    <Progress value={category.percentage} className="h-2" indicatorClassName="bg-primary" style={{ backgroundColor: `${category.displayColor}4D` /* Use color with opacity */, '--progress-indicator-color': category.displayColor } as React.CSSProperties} />
+                    <Progress value={category.percentage} className="h-2" indicatorClassName="bg-primary" style={{ backgroundColor: `${category.displayColor}4D`, '--progress-indicator-color': category.displayColor } as React.CSSProperties} />
                   </div>
                 );
               }) : (
@@ -496,14 +460,13 @@ const Dashboard = () => {
           </Card>
         </div>
       </div>
-      {/* ... rest of dashboard ... */}
 
       {editingExpense && (
         <Dialog open={showEditExpenseDialog} onOpenChange={(isOpen) => {
           setShowEditExpenseDialog(isOpen);
           if (!isOpen) setEditingExpense(null);
         }}>
-          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-3xl"> {/* Changed lg:max-w-2xl to lg:max-w-3xl */}
+          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-3xl">
             <DialogHeader>
               <DialogTitle>Edit Expense</DialogTitle>
             </DialogHeader>

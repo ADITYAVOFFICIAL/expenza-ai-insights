@@ -96,6 +96,12 @@
     "color": "#f472b6"
   },
   {
+    "id": "allowance",
+    "name": "Allowance",
+    "icon": "Landmark",
+    "color": "#22c55e"
+  },
+  {
     "id": "other",
     "name": "Other",
     "icon": "MoreHorizontal",

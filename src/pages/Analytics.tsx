@@ -1,19 +1,17 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Download, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import BankChart from '@/components/charts/BankChart';
 import SavingsCategoryChart from '@/components/charts/SavingsCategoryChart';
 import SavingsTrackingChart from '@/components/charts/SavingsTrackingChart';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
-import { databaseService, authService } from '@/lib/appwrite'; // Added authService
-import { Expense, RecurringExpense } from '@/types/expense'; // Ensure RecurringExpense is in types
-import { Allowance } from '@/lib/allowanceService';
+import { databaseService } from '@/lib/appwrite';
+import { Expense, RecurringExpense } from '@/types/expense';
 import { Goal } from '@/types/goal';
 import { toast } from '@/hooks/use-toast';
-import FinancialTrendsChart from '@/components/charts/FinancialTrendsChart'; // Ensure this import is present
+import FinancialTrendsChart from '@/components/charts/FinancialTrendsChart';
 import { 
   format, 
   parseISO, 
@@ -33,10 +31,10 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
   endOfDay,
-  endOfWeek, // Added for trend calculation
+  endOfWeek,
 } from 'date-fns';
 import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
-import { useIsMobile } from '@/hooks/use-mobile'; // Add this if not already present
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MonthlyTrend {
   month: string;
@@ -50,12 +48,12 @@ interface CategorySpending {
   amount: number;
   budget?: number;
   percentage?: number;
-  color?: string; // Added for consistency if needed by charts
+  color?: string;
 }
 
 interface DailySpending {
-  day: string; // Format: 'dd' for chart display
-  fullDate: string; // Format: 'yyyy-MM-dd' for sorting/reference
+  day: string;
+  fullDate: string;
   amount: number;
 }
 
@@ -66,35 +64,33 @@ interface BankData {
   percentage?: number;
 }
 
-interface SavingsDataPoint { // From SavingsTrackingChart
+interface SavingsDataPoint {
   period: string;
   saved: number;
   target: number;
-  difference: number; // Make it non-optional here as the chart expects it
+  difference: number;
 }
-
 
 const Analytics = () => {
   const { user } = useAuth();
-  const isMobile = useIsMobile(); // Existing
-  const [loading, setLoading] = useState(true); // For main analytics data
-  const [error, setError] = useState<string | null>(null); // For page data
+  const isMobile = useIsMobile();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [timeFilter, setTimeFilter] = useState('thisMonth'); // Existing
+  const [timeFilter, setTimeFilter] = useState('thisMonth');
   const [customDate, setCustomDate] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth(),
   });
-  const [expenses, setExpenses] = useState<Expense[]>([]); // Existing
-  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]); // Existing
-  const [allowances, setAllowances] = useState<Allowance[]>([]); // Existing
-  const [goals, setGoals] = useState<Goal[]>([]); // Existing
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
 
-  const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]); // Ensure this state exists
+  const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
   const [categorySpending, setCategorySpending] = useState<CategorySpending[]>([]);
   const [dailySpending, setDailySpending] = useState<DailySpending[]>([]);
   const [expenseByBank, setExpenseByBank] = useState<BankData[]>([]);
-  const [allowanceByBank, setAllowanceByBank] = useState<BankData[]>([]);
+  const [incomeBySource, setIncomeBySource] = useState<BankData[]>([]);
   const [savingsChartData, setSavingsChartData] = useState<{ weekly: SavingsDataPoint[], monthly: SavingsDataPoint[] }>({ weekly: [], monthly: [] });
   const [savingsCategoryData, setSavingsCategoryData] = useState<any[]>([]);
 
@@ -103,35 +99,29 @@ const Analytics = () => {
   const [netSavings, setNetSavings] = useState(0);
   const [avgDailySpend, setAvgDailySpend] = useState(0);
 
-  const [showExportDialog, setShowExportDialog] = useState(false); // Existing
-  const [analyticsExportData, setAnalyticsExportData] = useState<AnalyticsExportableData | null>(null); // Existing
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [analyticsExportData, setAnalyticsExportData] = useState<AnalyticsExportableData | null>(null);
 
-  const generateRandomColor = () => `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`; // Existing
+  const generateRandomColor = () => `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
 
   const fetchData = useCallback(async () => {
     if (!user?.$id) return;
-    setLoading(true); // For main analytics data
+    setLoading(true);
     setError(null);
     try {
-      const [expensesRes, recurringExpensesRes, allowancesRes, goalsRes, profileRes] = await Promise.all([
+      const [expensesRes, recurringExpensesRes, goalsRes] = await Promise.all([
         databaseService.getExpenses(user.$id, 1000),
         databaseService.getRecurringExpenses(user.$id),
-        databaseService.getAllowances(user.$id),
         databaseService.getGoals(user.$id),
-        authService.getUserProfile(user.$id) // Fetch user profile
       ]);
       setExpenses((expensesRes.documents as unknown as Expense[]) || []);
       setRecurringExpenses((recurringExpensesRes.documents as unknown as RecurringExpense[]) || []);
-      setAllowances((allowancesRes.documents as unknown as Allowance[]) || []);
       setGoals((goalsRes.documents as unknown as Goal[]) || []);
-    
-
     } catch (err: any) {
       console.error("Error fetching analytics data:", err);
       setError("Failed to load analytics data. Please try again.");
       toast({ title: "Error", description: "Could not load analytics data.", variant: "destructive" });
     }
-    // setLoading(false) will be handled by the processing useEffect
   }, [user]);
 
   useEffect(() => {
@@ -145,46 +135,43 @@ const Analytics = () => {
     switch (timeFilter) {
       case 'lastMonth':
         start = startOfMonth(subMonths(now, 1));
-        end = endOfMonth(subMonths(now, 1));
+        end = endOfDay(endOfMonth(subMonths(now, 1)));
         label = "Last Month";
         break;
       case 'last3Months':
         start = startOfMonth(subMonths(now, 2));
-        end = endOfMonth(now); // Includes current month
+        end = endOfDay(endOfMonth(now));
         label = "Last 3 Months";
         break;
       case 'thisYear':
         start = startOfYear(now);
-        end = endOfYear(now);
+        end = endOfDay(endOfYear(now));
         label = "This Year";
         break;
       case 'custom':
         const customSelectedDate = new Date(customDate.year, customDate.month);
         start = startOfMonth(customSelectedDate);
-        end = endOfMonth(customSelectedDate);
+        end = endOfDay(endOfMonth(customSelectedDate));
         label = format(customSelectedDate, 'MMMM yyyy');
         break;
       case 'thisMonth':
       default:
         start = startOfMonth(now);
-        end = endOfMonth(now);
+        end = endOfDay(endOfMonth(now));
         label = "This Month";
     }
     return { start, end, label };
   }, [timeFilter, customDate]);
 
-  // Define processedRecurringInstances first
   const processedRecurringInstances = useMemo(() => {
     const instances: Expense[] = [];
     const { start: intervalStart, end: intervalEnd } = dateInterval;
 
     recurringExpenses.forEach(re => {
       if (!re.isActive || !re.nextDueDate) return;
-
       let currentPaymentDate = parseISO(re.nextDueDate);
       if (!isValid(currentPaymentDate)) return;
       
-      // Advance currentPaymentDate to the first occurrence within or after intervalStart
       while (currentPaymentDate < intervalStart) {
         let advanced = false;
         if (re.frequency === 'daily') { currentPaymentDate = addDays(currentPaymentDate, 1); advanced = true; }
@@ -203,10 +190,10 @@ const Analytics = () => {
           category: re.category,
           date: format(currentPaymentDate, 'yyyy-MM-dd'),
           bank: re.bank,
-          paymentApp: re.paymentMethod, // Map from RecurringExpense.paymentMethod
+          paymentMethod: re.paymentMethod,
           notes: re.notes || `Recurring schedule: ${re.frequency}`,
           isRecurringInstance: true,
-          currency: 'INR', // Assuming INR or get from re.currency if available
+          currency: 'INR',
           $createdAt: currentPaymentDate.toISOString(),
           $updatedAt: currentPaymentDate.toISOString(),
         } as Expense);
@@ -216,14 +203,12 @@ const Analytics = () => {
         else if (re.frequency === 'weekly') { currentPaymentDate = addWeeks(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
-        
         if (!advanced || !isValid(currentPaymentDate)) break;
       }
     });
     return instances;
   }, [recurringExpenses, dateInterval]);
 
-  // Now define combinedExpensesForFilterPeriod, which depends on processedRecurringInstances
   const combinedExpensesForFilterPeriod = useMemo(() => {
     const { start: intervalStart, end: intervalEnd } = dateInterval;
     const filteredRegularExpenses = expenses.filter(exp => {
@@ -233,53 +218,35 @@ const Analytics = () => {
     return [...filteredRegularExpenses, ...processedRecurringInstances].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
   }, [expenses, processedRecurringInstances, dateInterval]);
 
-  const filteredAllowancesForPeriod = useMemo(() => {
-    const { start: startDate, end: endDate } = dateInterval;
-    return allowances.filter(allow => {
-      const allowDateStr = allow.nextReceived || allow.$createdAt; // Use nextReceived first, fallback to createdAt
-      if (!allowDateStr) return false;
-      const allowDate = parseISO(allowDateStr);
-      return isValid(allowDate) && isWithinInterval(allowDate, { start: startDate, end: endDate });
-    });
-  }, [allowances, dateInterval]);
-
-
   useEffect(() => {
     if (!user?.$id) {
       setLoading(false);
       return;
     }
-    // If initial data hasn't arrived yet, and we are in loading state, wait.
-    if (loading && combinedExpensesForFilterPeriod.length === 0 && allowances.length === 0 && goals.length === 0 && expenses.length === 0 && recurringExpenses.length === 0) {
-        // This condition means fetchData might not have completed or returned no data.
-        // setLoading(false) will be called at the end of this effect.
+    if (loading && combinedExpensesForFilterPeriod.length === 0 && goals.length === 0 && expenses.length === 0 && recurringExpenses.length === 0) {
+        return;
     }
     
     const { start: startDate, end: endDate, label: timeFilterLabel } = dateInterval;
-
-    // Use combinedExpensesForFilterPeriod directly as it's already filtered for the period
     const currentFilteredExpenses = combinedExpensesForFilterPeriod;
-    
-    const currentFilteredAllowances = filteredAllowancesForPeriod;
+    const positiveExpenses = currentFilteredExpenses.filter(e => e.amount >= 0);
+    const incomeTransactions = currentFilteredExpenses.filter(e => e.amount < 0);
 
-    // Monthly Trends (Expenses, Income, Savings)
+    // Monthly Trends
     const trends: { [key: string]: { expenses: number, income: number } } = {};
-    const monthYearFormat = 'MMM yyyy';
-    
-    // Determine aggregation period for trends (daily, weekly, monthly)
     const daysInInterval = differenceInDays(endDate, startDate);
     let trendPeriods: Date[];
     let trendDateFormat: string;
 
-    if (daysInInterval <= 31) { // Daily for up to a month
+    if (daysInInterval <= 31) {
         trendPeriods = eachDayOfInterval({ start: startDate, end: endDate });
         trendDateFormat = 'MMM dd';
-    } else if (daysInInterval <= 93) { // Weekly for up to ~3 months
+    } else if (daysInInterval <= 93) {
         trendPeriods = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
-        trendDateFormat = 'MMM dd'; // Week starting
-    } else { // Monthly for longer
+        trendDateFormat = 'MMM dd';
+    } else {
         trendPeriods = eachMonthOfInterval({ start: startDate, end: endDate });
-        trendDateFormat = monthYearFormat;
+        trendDateFormat = 'MMM yyyy';
     }
     
     trendPeriods.forEach(periodStart => {
@@ -291,7 +258,7 @@ const Analytics = () => {
       const expDate = parseISO(exp.date);
       if(!isValid(expDate)) return;
       let periodLabelToUpdate: string | null = null;
-      for (const periodStart of trendPeriods.slice().reverse()) { // Iterate backwards to find the correct period
+      for (const periodStart of trendPeriods.slice().reverse()) {
           let periodEndCheck: Date;
           if (daysInInterval <= 31) periodEndCheck = endOfDay(periodStart);
           else if (daysInInterval <= 93) periodEndCheck = endOfWeek(periodStart, { weekStartsOn: 1 });
@@ -302,29 +269,11 @@ const Analytics = () => {
           }
       }
       if (periodLabelToUpdate && trends[periodLabelToUpdate]) {
-        trends[periodLabelToUpdate].expenses += exp.amount;
-      }
-    });
-
-    currentFilteredAllowances.forEach(allow => {
-      const allowDateStr = allow.nextReceived || allow.$createdAt;
-      if (!allowDateStr) return;
-      const allowDate = parseISO(allowDateStr);
-      if(!isValid(allowDate)) return;
-
-      let periodLabelToUpdate: string | null = null;
-      for (const periodStart of trendPeriods.slice().reverse()) {
-          let periodEndCheck: Date;
-          if (daysInInterval <= 31) periodEndCheck = endOfDay(periodStart);
-          else if (daysInInterval <= 93) periodEndCheck = endOfWeek(periodStart, { weekStartsOn: 1 });
-          else periodEndCheck = endOfMonth(periodStart);
-          if (isWithinInterval(allowDate, { start: periodStart, end: periodEndCheck })) {
-              periodLabelToUpdate = format(periodStart, trendDateFormat);
-              break;
-          }
-      }
-      if (periodLabelToUpdate && trends[periodLabelToUpdate]) {
-        trends[periodLabelToUpdate].income += allow.amount;
+        if (exp.amount >= 0) {
+          trends[periodLabelToUpdate].expenses += exp.amount;
+        } else {
+          trends[periodLabelToUpdate].income += Math.abs(exp.amount);
+        }
       }
     });
 
@@ -332,7 +281,7 @@ const Analytics = () => {
         const periodLabel = format(periodStart, trendDateFormat);
         const data = trends[periodLabel] || { expenses: 0, income: 0 };
         return {
-            month: periodLabel, // 'month' key is used by chart, but value can be day/week/month label
+            month: periodLabel,
             expenses: data.expenses,
             income: data.income,
             savings: data.income - data.expenses
@@ -342,7 +291,7 @@ const Analytics = () => {
 
     // Category Spending
     const catSpending: { [key: string]: number } = {};
-    currentFilteredExpenses.forEach(exp => {
+    positiveExpenses.forEach(exp => {
       catSpending[exp.category] = (catSpending[exp.category] || 0) + exp.amount;
     });
     const totalCatSpending = Object.values(catSpending).reduce((s, v) => s + v, 0);
@@ -350,17 +299,17 @@ const Analytics = () => {
         category, 
         amount, 
         percentage: totalCatSpending > 0 ? parseFloat(((amount / totalCatSpending) * 100).toFixed(1)) : 0,
-        color: generateRandomColor() // Assign color for charts if needed
+        color: generateRandomColor()
     })).sort((a,b) => b.amount - a.amount);
     setCategorySpending(newCategorySpending);
     
-    // Daily Spending (for the selected interval, not just one month)
+    // Daily Spending
     const dailyData: { [key: string]: number } = {};
     const daysInSelectedInterval = eachDayOfInterval({ start: startDate, end: endDate });
     daysInSelectedInterval.forEach(day => {
       dailyData[format(day, 'yyyy-MM-dd')] = 0;
     });
-    currentFilteredExpenses.forEach(exp => {
+    positiveExpenses.forEach(exp => {
       const dayKey = format(parseISO(exp.date), 'yyyy-MM-dd');
       if (dailyData.hasOwnProperty(dayKey)) {
         dailyData[dayKey] += exp.amount;
@@ -373,7 +322,7 @@ const Analytics = () => {
     
     // Expense by Bank
     const expBank: { [key: string]: number } = {};
-    currentFilteredExpenses.forEach(exp => {
+    positiveExpenses.forEach(exp => {
       if (exp.bank) { expBank[exp.bank] = (expBank[exp.bank] || 0) + exp.amount; }
     });
     const currentTotalBankExpense = Object.values(expBank).reduce((sum, val) => sum + val, 0);
@@ -382,53 +331,49 @@ const Analytics = () => {
       percentage: currentTotalBankExpense > 0 ? parseFloat(((value / currentTotalBankExpense) * 100).toFixed(1)) : 0
     })).sort((a,b) => b.value - a.value);
     setExpenseByBank(newExpenseByBank);
-    setTotalSpent(currentTotalBankExpense); // This is total expenses from banks, might need overall total
 
-    // Allowance by Bank
-    const allowBank: { [key: string]: number } = {};
-    currentFilteredAllowances.forEach(allow => {
-      if (allow.bankName) { allowBank[allow.bankName] = (allowBank[allow.bankName] || 0) + allow.amount; }
+    // Income by Source
+    const incomeSourceMap: { [key: string]: number } = {};
+    incomeTransactions.forEach(exp => {
+      const source = exp.bank || 'Other Income';
+      incomeSourceMap[source] = (incomeSourceMap[source] || 0) + Math.abs(exp.amount);
     });
-    const currentTotalBankAllowance = Object.values(allowBank).reduce((sum, val) => sum + val, 0);
-    const newAllowanceByBank = Object.entries(allowBank).map(([name, value]) => ({
+    const totalIncomeBySource = Object.values(incomeSourceMap).reduce((sum, val) => sum + val, 0);
+    const newIncomeBySourceData = Object.entries(incomeSourceMap).map(([name, value]) => ({
       name, value, color: generateRandomColor(),
-      percentage: currentTotalBankAllowance > 0 ? parseFloat(((value / currentTotalBankAllowance) * 100).toFixed(1)) : 0
+      percentage: totalIncomeBySource > 0 ? parseFloat(((value / totalIncomeBySource) * 100).toFixed(1)) : 0
     })).sort((a,b) => b.value - a.value);
-    setAllowanceByBank(newAllowanceByBank);
-    setTotalIncome(currentTotalBankAllowance); // This is total income from allowances
+    setIncomeBySource(newIncomeBySourceData);
 
     // Update overall summary stats
-    const overallTotalSpent = currentFilteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const overallTotalSpent = positiveExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const overallTotalIncome = incomeTransactions.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
     setTotalSpent(overallTotalSpent);
-    const overallTotalIncome = currentFilteredAllowances.reduce((sum, allow) => sum + allow.amount, 0);
     setTotalIncome(overallTotalIncome);
-
     const currentNetSavings = overallTotalIncome - overallTotalSpent;
     setNetSavings(currentNetSavings);
     const numberOfDaysInPeriod = differenceInDays(endDate, startDate) + 1;
     setAvgDailySpend(numberOfDaysInPeriod > 0 ? overallTotalSpent / numberOfDaysInPeriod : 0);
 
-    // Savings Chart Data (based on Goals) - This logic remains largely the same
+    // Savings Chart Data (based on Goals)
     const monthlySavingsData: SavingsDataPoint[] = goals.map(goal => ({
-        period: goal.name || `Goal ${goal.$id?.substring(0,5)}`, // Use optional chaining for $id
+        period: goal.name || `Goal ${goal.$id?.substring(0,5)}`,
         saved: goal.currentAmount,
         target: goal.targetAmount,
-        difference: goal.targetAmount - goal.currentAmount, // Calculate the difference
+        difference: goal.targetAmount - goal.currentAmount,
     }));
-    // TODO: Implement weekly savings data if needed, for now, it's empty or also calculate difference
     setSavingsChartData({ weekly: [], monthly: monthlySavingsData });
 
-    // Savings Category Chart Data (Spending by category, for chart that shows categories)
+    // Spending by Category Over Time Chart Data
     const catMonthlySpendingForChart: { [month: string]: { [category: string]: number } } = {};
-    currentFilteredExpenses.forEach(exp => {
-        // Use a consistent period label, e.g., 'MMM' if grouping by month for this specific chart
+    positiveExpenses.forEach(exp => {
         const monthLabel = format(parseISO(exp.date), 'MMM'); 
         catMonthlySpendingForChart[monthLabel] = catMonthlySpendingForChart[monthLabel] || {};
         catMonthlySpendingForChart[monthLabel][exp.category] = (catMonthlySpendingForChart[monthLabel][exp.category] || 0) + exp.amount;
     });
-    const allCategoriesForChart = [...new Set(currentFilteredExpenses.map(e => e.category))];
+    const allCategoriesForChart = [...new Set(positiveExpenses.map(e => e.category))];
     const processedSavingsCategoryData = Object.entries(catMonthlySpendingForChart).map(([month, categories]) => {
-        const monthData: any = { month }; // 'month' is the period label for the chart
+        const monthData: any = { month };
         allCategoriesForChart.forEach(cat => {
             monthData[cat.toLowerCase().replace(/\s+/g, '')] = categories[cat] || 0;
         });
@@ -447,31 +392,24 @@ const Analytics = () => {
       categorySpending: newCategorySpending,
       dailySpending: newDailySpending,
       expenseByBank: newExpenseByBank,
-      allowanceByBank: newAllowanceByBank,
+      allowanceByBank: newIncomeBySourceData,
       allExpenses: currentFilteredExpenses,
       timeFilterLabel: timeFilterLabel,
     });
 
-    setLoading(false); // Main analytics data loaded
+    setLoading(false);
 
-  }, [combinedExpensesForFilterPeriod, filteredAllowancesForPeriod, dateInterval, user, expenses, recurringExpenses, allowances, goals, loading]); // Dependencies for recalculating analytics
+  }, [combinedExpensesForFilterPeriod, dateInterval, user, expenses, recurringExpenses, goals, loading]);
 
   const earliestYear = useMemo(() => {
-    if (loading && expenses.length === 0 && allowances.length === 0) {
+    if (loading && expenses.length === 0) {
       return new Date().getFullYear() - 5;
     }
-    const allDates = [
-      ...expenses.map(e => e.date),
-      ...allowances.map(a => a.nextReceived || a.$createdAt)
-    ].map(d => d ? parseISO(d) : null).filter((d): d is Date => d !== null && isValid(d));
-
-    if (allDates.length === 0) {
-      return new Date().getFullYear() - 5;
-    }
-
+    const allDates = expenses.map(e => e.date ? parseISO(e.date) : null).filter((d): d is Date => d !== null && isValid(d));
+    if (allDates.length === 0) return new Date().getFullYear() - 5;
     const earliest = Math.min(...allDates.map(d => d.getFullYear()));
     return isFinite(earliest) ? earliest : new Date().getFullYear() - 5;
-  }, [expenses, allowances, loading]);
+  }, [expenses, loading]);
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
@@ -487,14 +425,12 @@ const Analytics = () => {
   const monthOptions = useMemo(() => {
     const isCurrentYearSelected = customDate.year === currentYear;
     const monthsToShow = isCurrentYearSelected ? currentMonth + 1 : 12;
-
     return Array.from({ length: monthsToShow }, (_, i) => ({
       value: i.toString(),
       label: format(new Date(2000, i, 1), 'MMMM')
     }));
   }, [customDate.year, currentYear, currentMonth]);
   
-  // Effect to adjust the month if the year changes and the selected month becomes invalid (i.e., a future month)
   useEffect(() => {
     const isCurrentYearSelected = customDate.year === currentYear;
     if (isCurrentYearSelected && customDate.month > currentMonth) {
@@ -502,7 +438,7 @@ const Analytics = () => {
     }
   }, [customDate.year, currentYear, currentMonth, customDate.month]);
 
-  if (loading && monthlyTrends.length === 0) { // Adjusted loading condition
+  if (loading && monthlyTrends.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
         <div className="text-center">
@@ -526,7 +462,6 @@ const Analytics = () => {
 
   return (
     <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
-      {/* Header and Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Analytics</h1>
@@ -591,7 +526,6 @@ const Analytics = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         {[
           { label: 'Total Spent', value: `₹${totalSpent.toLocaleString()}`, description: `For selected period` },
@@ -609,12 +543,10 @@ const Analytics = () => {
         ))}
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
-        {/* Expenses by Bank Chart */}
         <Card>
           <CardHeader><CardTitle className="text-lg">Expenses by Bank</CardTitle></CardHeader>
-          <CardContent id="analyticsChartExpensesByBank"> {/* ID for export */}
+          <CardContent id="analyticsChartExpensesByBank">
             {expenseByBank.length > 0 ? <BankChart data={expenseByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank expense data.</p>}
             {expenseByBank.length > 0 && (
               <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
@@ -632,14 +564,13 @@ const Analytics = () => {
           </CardContent>
         </Card>
 
-        {/* Allowance by Bank Chart */}
         <Card>
-          <CardHeader><CardTitle className="text-lg">Allowance by Bank</CardTitle></CardHeader>
-          <CardContent id="analyticsChartAllowanceByBank"> {/* ID for export */}
-            {allowanceByBank.length > 0 ? <BankChart data={allowanceByBank} title="" /> : <p className="text-muted-foreground text-center py-8">No bank allowance data.</p>}
-             {allowanceByBank.length > 0 && (
+          <CardHeader><CardTitle className="text-lg">Income by Source</CardTitle></CardHeader>
+          <CardContent id="analyticsChartAllowanceByBank">
+            {incomeBySource.length > 0 ? <BankChart data={incomeBySource} title="" /> : <p className="text-muted-foreground text-center py-8">No income data.</p>}
+             {incomeBySource.length > 0 && (
                 <div className={`mt-4 grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-x-4 gap-y-2`}>
-                {allowanceByBank.map((bank) => (
+                {incomeBySource.map((bank) => (
                     <div key={bank.name} className="flex items-center justify-between text-xs sm:text-sm">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: bank.color }}></div>

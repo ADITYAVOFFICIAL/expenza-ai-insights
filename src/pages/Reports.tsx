@@ -7,14 +7,11 @@ import {
   TrendingUp,
   DollarSign,
   AlertTriangle,
-  Banknote,
-  BarChart2,
-  PieChart as PieIcon,
-  ListChecks, // Added for "All Categories"
+  ListChecks,
   CreditCard,
-  Tag, // Default icon for categories
+  Tag,
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react'; // To dynamically load icons
+import * as LucideIcons from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,9 +45,9 @@ import {
 } from 'date-fns';
 import paymentAppsData from '@/data/paymentApps.json';
 import banksData from '@/data/banks.json';
-import categoriesData from '@/data/categories.json'; // Import categories data
+import categoriesData from '@/data/categories.json';
 import { useIsMobile } from '@/hooks/use-mobile';
-import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog'; // Import the dialog
+import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
 
 const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#6b7280', '#ec4899', '#6366f1'];
 
@@ -62,10 +59,10 @@ interface BankSuggestion {
 
 interface ReportCategoryDetail {
   id: string;
-  name: string; // Original name from data or the ID itself if not found
-  label: string; // Capitalized name for display
-  iconName?: string; // Icon name string from categories.json
-  IconComponent: React.ElementType; // Actual Lucide icon component
+  name: string;
+  label: string;
+  iconName?: string;
+  IconComponent: React.ElementType;
 }
 
 const reportChartConfigs = [
@@ -92,7 +89,7 @@ const Reports = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [dateRange, setDateRange] = useState('thisMonth');
-  const [categoryFilter, setCategoryFilter] = useState('all'); // Stores category ID or 'all'
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [bankFilter, setBankFilter] = useState('all');
 
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -140,7 +137,7 @@ const Reports = () => {
         return { start: startOfMonth(subMonths(now, 2)), end: endOfDay(endOfMonth(now)) };
       case 'thisYear':
         return { start: startOfYear(now), end: endOfDay(endOfYear(now)) };
-      default: // Should not happen with select
+      default:
         return { start: startOfMonth(now), end: endOfDay(endOfMonth(now)) };
     }
   }, [dateRange]);
@@ -153,20 +150,16 @@ const Reports = () => {
     const intervalEnd = dateInterval.end;
 
     allRecurringExpenses.forEach(re => {
-      if (!re.nextDueDate || !re.frequency || re.amount <= 0) return;
-
+      if (!re.isActive || !re.nextDueDate || !re.frequency || re.amount <= 0) return;
       let currentPaymentDate = parseISO(re.nextDueDate);
       if (!isValid(currentPaymentDate)) return;
 
-      // Advance currentPaymentDate to be within or after the interval start if it's before
-      // This ensures we don't generate past instances unnecessarily if nextDueDate is old
       while (currentPaymentDate < intervalStart) {
         let advanced = false;
         if (re.frequency === 'daily') { currentPaymentDate = addDays(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'weekly') { currentPaymentDate = addWeeks(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
-        
         if (!advanced || !isValid(currentPaymentDate)) return; 
       }
 
@@ -192,7 +185,6 @@ const Reports = () => {
         else if (re.frequency === 'weekly') { currentPaymentDate = addWeeks(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'monthly') { currentPaymentDate = addMonths(currentPaymentDate, 1); advanced = true; }
         else if (re.frequency === 'yearly') { currentPaymentDate = addYears(currentPaymentDate, 1); advanced = true; }
-
         if (!advanced) break; 
       }
     });
@@ -203,7 +195,7 @@ const Reports = () => {
     return [...allExpenses, ...processedRecurringInstances];
   }, [allExpenses, processedRecurringInstances]);
   
-  const filteredExpenses = useMemo(() => {
+  const filteredTransactions = useMemo(() => {
     return combinedExpenses.filter(expense => {
       if (!expense.date || !dateInterval.start || !dateInterval.end) return false;
       const expenseDate = parseISO(expense.date);
@@ -217,14 +209,20 @@ const Reports = () => {
     });
   }, [combinedExpenses, dateInterval, categoryFilter, bankFilter]);
 
+  // FIX: Create a separate array that *only* contains positive expenses for expense-specific charts
+  const filteredExpenses = useMemo(() => {
+    return filteredTransactions.filter(t => t.amount >= 0);
+  }, [filteredTransactions]);
+
   const expensesByCategory = useMemo(() => {
     const categoryMap: { [key: string]: number } = {};
+    // Use filteredExpenses (only positive amounts)
     filteredExpenses.forEach(expense => {
       const category = expense.category || 'Others';
       categoryMap[category] = (categoryMap[category] || 0) + expense.amount;
     });
     return Object.entries(categoryMap).map(([name, amount], index) => ({
-      name, // This should be category ID. We'll resolve to name for display later if needed or use ID.
+      name,
       amount,
       color: COLORS[index % COLORS.length],
     })).sort((a,b) => b.amount - a.amount);
@@ -240,13 +238,13 @@ const Reports = () => {
 
     if (daysInInterval <= 0) return []; 
 
-    if (daysInInterval <= 31) { // Daily for up to 1 month
+    if (daysInInterval <= 31) {
       periods = eachDayOfInterval(dateInterval);
       dateFormat = 'MMM dd';
-    } else if (daysInInterval <= 93) { // Weekly for up to 3 months
+    } else if (daysInInterval <= 93) {
       periods = eachWeekOfInterval(dateInterval, { weekStartsOn: 1 });
-      dateFormat = "MMM dd'W'"; // e.g., "Jan 01W"
-    } else { // Monthly for longer
+      dateFormat = "MMM dd'W'";
+    } else {
       periods = eachMonthOfInterval(dateInterval);
       dateFormat = 'MMM yyyy';
     }
@@ -254,26 +252,25 @@ const Reports = () => {
     const periodObjects: {date: Date, label: string}[] = periods.map(p => ({date: p, label: format(p, dateFormat)}));
     periodObjects.forEach(pObj => trendMap[pObj.label] = 0);
 
+    // Use filteredExpenses (only positive amounts)
     filteredExpenses.forEach(expense => {
         const expenseDate = parseISO(expense.date);
         if (!isValid(expenseDate)) return;
 
         let periodLabelToUpdate: string | null = null;
-
-        // Find which period this expense belongs to
         for (const pObj of periodObjects) {
-            if (daysInInterval <= 31) { // Daily
+            if (daysInInterval <= 31) {
                 if (format(expenseDate, 'MMM dd') === pObj.label) {
                     periodLabelToUpdate = pObj.label;
                     break;
                 }
-            } else if (daysInInterval <= 93) { // Weekly
+            } else if (daysInInterval <= 93) {
                 const weekStart = startOfWeek(expenseDate, { weekStartsOn: 1 });
                 if (format(weekStart, "MMM dd'W'") === pObj.label) {
                     periodLabelToUpdate = pObj.label;
                     break;
                 }
-            } else { // Monthly
+            } else {
                 if (format(expenseDate, 'MMM yyyy') === pObj.label) {
                     periodLabelToUpdate = pObj.label;
                     break;
@@ -287,12 +284,13 @@ const Reports = () => {
 
     return periodObjects
         .map(pObj => ({ period: pObj.label, amount: trendMap[pObj.label] || 0, date: pObj.date }))
-        .sort((a,b) => a.date.getTime() - b.date.getTime()) // Ensure chronological order
-        .map(({period, amount}) => ({period, amount})); // Remove date for final chart data
+        .sort((a,b) => a.date.getTime() - b.date.getTime())
+        .map(({period, amount}) => ({period, amount}));
 
   }, [filteredExpenses, dateInterval]);
 
   const topExpensesList = useMemo(() => {
+    // Use filteredExpenses (only positive amounts)
     return [...filteredExpenses]
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
@@ -300,12 +298,13 @@ const Reports = () => {
         name: exp.name,
         amount: exp.amount,
         date: exp.date ? format(parseISO(exp.date), 'yyyy-MM-dd') : 'N/A',
-        category: exp.category, // This is category ID
+        category: exp.category,
       }));
   }, [filteredExpenses]);
 
   const bankWiseExpensesData = useMemo(() => {
     const bankMap: { [key: string]: { bank: string; amount: number; transactions: number } } = {};
+    // Use filteredExpenses (only positive amounts)
     filteredExpenses.forEach(expense => {
       const bankName = expense.bank || 'Unknown Bank';
       if (!bankMap[bankName]) {
@@ -319,31 +318,30 @@ const Reports = () => {
 
   const paymentAppUsageData = useMemo(() => {
     const appMap: { [key: string]: { app: string; amount: number; count: number } } = {};
-    const nonAppMethodKeywords = ['cash', 'credit card', 'bank transfer', 'debit card', 'other', 'card']; // Keywords for non-app methods
+    const nonAppMethodKeywords = ['cash', 'credit card', 'bank transfer', 'debit card', 'other', 'card'];
 
+    // Use filteredExpenses (only positive amounts)
     filteredExpenses.forEach(expense => {
-      const paymentIdentifier = expense.paymentMethod; // This is the ID or name from expense data
+      const paymentIdentifier = expense.paymentMethod;
       let appNameForGrouping: string;
 
       if (paymentIdentifier) {
-        // Check if it's a known app from paymentAppsData
         const knownApp = paymentAppsData.find(
           app => app.id.toLowerCase() === paymentIdentifier.toLowerCase() || 
                  app.name.toLowerCase() === paymentIdentifier.toLowerCase()
         );
 
         if (knownApp) {
-          appNameForGrouping = knownApp.name; // Use the display name from paymentAppsData
+          appNameForGrouping = knownApp.name;
         } else {
-          // If not a known app, check if it's a generic payment method
           if (nonAppMethodKeywords.some(keyword => paymentIdentifier.toLowerCase().includes(keyword))) {
              appNameForGrouping = 'Other/Cash';
           } else {
-             appNameForGrouping = paymentIdentifier; // Treat as a distinct, possibly unlisted, app
+             appNameForGrouping = paymentIdentifier;
           }
         }
       } else {
-        appNameForGrouping = 'Other/Cash'; // Default if no payment method specified
+        appNameForGrouping = 'Other/Cash';
       }
 
       if (!appMap[appNameForGrouping]) {
@@ -359,6 +357,7 @@ const Reports = () => {
     if (!dateInterval.start || !dateInterval.end) {
         return { totalExpenses: 0, avgDailyExpense: 0, totalTransactions: 0, daysTracked: 0 };
     }
+    // Use filteredExpenses (only positive amounts)
     const total = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     const numDays = differenceInDays(dateInterval.end, dateInterval.start) + 1;
     const avgDaily = numDays > 0 ? total / numDays : 0;
@@ -404,7 +403,7 @@ const Reports = () => {
     
     const suggestions: BankSuggestion[] = Array.from(bankNames).sort().map(name => {
       const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
-      return { name, icon: bankFromFile?.icon, label: name }; // label is just name for banks
+      return { name, icon: bankFromFile?.icon, label: name };
     });
     
     return [{ name: 'all', label: 'All Banks', icon: undefined }, ...suggestions];
@@ -412,17 +411,16 @@ const Reports = () => {
 
   const selectedBankForFilter = uniqueBanks.find(b => b.name === bankFilter);
 
-  // Responsive Pie Chart settings
   const pieOuterRadius = isMobile ? 70 : 120;
   const pieInnerRadius = isMobile ? 35 : 60;
-  const pieLabelMinPercentage = isMobile ? 6 : 3; // Min percentage to show label
+  const pieLabelMinPercentage = isMobile ? 6 : 3;
   const pieLabelFontSize = isMobile ? 10 : 12;
-  const pieLabelNameMaxLength = isMobile ? 7 : 15; // Max length for category name in label
+  const pieLabelNameMaxLength = isMobile ? 7 : 15;
   const legendIconSize = isMobile ? 8 : 10;
   const legendFontSize = isMobile ? '10px' : '12px';
 
   useEffect(() => {
-    if (loading || error || !dateInterval.start || !dateInterval.end || !summaryStats || !expenseTrendData || !expensesByCategory || !bankWiseExpensesData || !filteredExpenses) {
+    if (loading || error || !dateInterval.start || !dateInterval.end || !summaryStats || !expenseTrendData || !expensesByCategory || !bankWiseExpensesData || !filteredTransactions) {
       setCurrentReportExportData(null);
       return;
     }
@@ -460,18 +458,17 @@ const Reports = () => {
       summaryMetrics: summaryMetricsData,
       monthlyTrends: trendData,
       categorySpending: categorySpendingData,
-      dailySpending: [], // Not directly applicable or can be mapped from expenseTrendData if daily
+      dailySpending: [],
       expenseByBank: bankExpenseData,
-      allowanceByBank: [], // No allowance data in reports
-      allExpenses: filteredExpenses.map(e => ({...e, notes: e.notes || (e.isRecurringInstance ? `Recurring: ${e.name}` : '')})),
+      allowanceByBank: [],
+      allExpenses: filteredTransactions.map(e => ({...e, notes: e.notes || (e.isRecurringInstance ? `Recurring: ${e.name}` : '')})),
       timeFilterLabel,
     });
   }, [
     loading, error, dateInterval, dateRange, categoryFilter, bankFilter,
     summaryStats, expenseTrendData, expensesByCategory, bankWiseExpensesData,
-    filteredExpenses, uniqueCategories, uniqueBanks // Added uniqueCategories and uniqueBanks
+    filteredTransactions, uniqueCategories, uniqueBanks
   ]);
-
 
   if (loading) {
     return (
@@ -494,7 +491,6 @@ const Reports = () => {
 
   return (
     <div className="space-y-6 p-4 lg:p-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-primary" />
@@ -523,7 +519,6 @@ const Reports = () => {
         </Button>
       </div>
 
-      {/* Filters Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -596,7 +591,6 @@ const Reports = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
           <CardContent className="p-3 sm:p-4">
@@ -652,7 +646,6 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -660,7 +653,7 @@ const Reports = () => {
           </CardHeader>
           <CardContent>
             {expensesByCategory.length > 0 ? (
-              <div id="reportCategoryPieChartWrapper"> {/* Added wrapper with ID */}
+              <div id="reportCategoryPieChartWrapper">
                 <ResponsiveContainer width="100%" height={isMobile ? 280 : 300}>
                   <PieChart>
                     <Pie
@@ -671,10 +664,9 @@ const Reports = () => {
                       outerRadius={pieOuterRadius}
                       paddingAngle={2}
                       dataKey="amount"
-                      nameKey="name" // This is category ID, tooltip/legend will need to resolve it
+                      nameKey="name"
                       labelLine={false}
                       label={({ cx, cy, midAngle, outerRadius: currentOuterRadius, percent, name }) => {
-                        // name here is category ID
                         if ((percent * 100) < pieLabelMinPercentage) return null;
                         const categoryDetail = uniqueCategories.find(c => c.id === name);
                         const displayName = categoryDetail ? categoryDetail.label : name;
@@ -695,7 +687,7 @@ const Reports = () => {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number, name: string) => { // name is category ID
+                      formatter={(value: number, name: string) => {
                         const categoryDetail = uniqueCategories.find(c => c.id === name);
                         const displayName = categoryDetail ? categoryDetail.label : name;
                         return [`₹${value.toLocaleString()}`, displayName];
@@ -704,10 +696,10 @@ const Reports = () => {
                         backgroundColor: 'hsl(var(--background))',
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
-                        color: 'hsl(var(--foreground))', // General text color for the tooltip box
+                        color: 'hsl(var(--foreground))',
                       }}
-                      itemStyle={{ color: 'hsl(var(--foreground))' }} // Styles the value part, e.g., "₹21,024"
-                      labelStyle={{ color: 'hsl(var(--foreground))' }} // Styles the label part, e.g., "Amount"
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
                     />
                   <Legend
                     iconSize={legendIconSize}
@@ -715,7 +707,7 @@ const Reports = () => {
                     layout={isMobile ? 'horizontal' : 'vertical'}
                     align={isMobile ? 'center' : 'right'}
                     verticalAlign={isMobile ? 'bottom' : 'middle'}
-                    formatter={(value) => { // value is category ID
+                    formatter={(value) => {
                       const categoryDetail = uniqueCategories.find(c => c.id === value);
                       const displayName = categoryDetail ? categoryDetail.label : value;
                       const nameMaxLength = isMobile ? 10 : 20;
@@ -735,7 +727,7 @@ const Reports = () => {
           </CardHeader>
           <CardContent>
             {expenseTrendData.length > 0 ? (
-              <div id="reportExpenseTrendChartWrapper"> {/* Added wrapper with ID */}
+              <div id="reportExpenseTrendChartWrapper">
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={expenseTrendData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -761,7 +753,6 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Detailed Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -776,8 +767,7 @@ const Reports = () => {
                   return (
                     <div key={index} className="p-3 rounded-lg hover:bg-muted/20 dark:hover:bg-muted/10 border border-transparent hover:border-border/30 transition-colors duration-150">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-2">
-                        {/* Details Section */}
-                        <div className="flex-grow min-w-0"> {/* min-w-0 for better truncation */}
+                        <div className="flex-grow min-w-0">
                           <div className="font-semibold text-sm sm:text-base text-foreground truncate" title={expense.name}>
                             {expense.name}
                           </div>
@@ -788,7 +778,6 @@ const Reports = () => {
                             </Badge>
                           </div>
                         </div>
-                        {/* Amount Section */}
                         <div className="sm:text-right flex-shrink-0 mt-1 sm:mt-0">
                           <div className={`font-bold text-sm sm:text-base ${expense.amount >= 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
                             ₹{Math.abs(expense.amount).toLocaleString()}
@@ -868,7 +857,6 @@ const Reports = () => {
         </CardContent>
       </Card>
 
-      {/* Export Dialog */}
       {showExportDialog && currentReportExportData && (
         <AnalyticsExportDialog
           open={showExportDialog}

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Plus, Edit, Trash2, Pause, Play, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Calendar, Plus, Edit, Trash2, AlertTriangle, Check, ChevronsUpDown, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import * as LucideIcons from 'lucide-react'; // Import all Lucide icons
-import categoriesData from '@/data/categories.json'; // Import categories data
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import * as LucideIcons from 'lucide-react';
+import categoriesData from '@/data/categories.json';
+import { Dialog,DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,27 +14,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { databaseService } from '@/lib/appwrite';
 import { RecurringExpense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
-import { format, differenceInDays, parseISO, isValid, startOfWeek, endOfWeek, startOfToday } from 'date-fns'; // Added startOfWeek, endOfWeek, startOfToday
-import banksData from '@/data/banks.json'; // Import bank data
-import paymentAppsData from '@/data/paymentApps.json'; // Import payment app data
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'; // Import Popover
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'; // Import Command components
-import { Check, ChevronsUpDown } from 'lucide-react'; // Import Check and ChevronsUpDown
-import { cn } from '@/lib/utils'; // Import cn utility
-import { Allowance } from '@/lib/allowanceService'; // Import Allowance type
+import { format, differenceInDays, parseISO, isValid, startOfWeek, endOfWeek, startOfToday, isBefore, isWithinInterval, addDays, addWeeks, addMonths, addYears } from 'date-fns';
+import banksData from '@/data/banks.json';
+import paymentAppsData from '@/data/paymentApps.json';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-// Helper to get category details (icon component and color) - can be shared or redefined
 const getCategoryDetails = (categoryId: string | undefined) => {
   const defaultIcon = LucideIcons.Briefcase;
   const defaultColor = 'hsl(var(--muted-foreground))';
-
-  if (!categoryId) {
-    return { IconComponent: defaultIcon, color: defaultColor, name: 'Other' };
-  }
+  if (!categoryId) return { IconComponent: defaultIcon, color: defaultColor, name: 'Other' };
   const category = categoriesData.find(cat => cat.id.toLowerCase() === categoryId.toLowerCase());
-  if (!category) {
-    return { IconComponent: defaultIcon, color: defaultColor, name: categoryId };
-  }
+  if (!category) return { IconComponent: defaultIcon, color: defaultColor, name: categoryId };
   const IconComponent = (LucideIcons as any)[category.icon] || defaultIcon;
   return { IconComponent, color: category.color || defaultColor, name: category.name };
 };
@@ -58,7 +51,7 @@ interface BankSuggestion {
 const initialRecurringFormState: RecurringFormState = {
   name: '',
   amount: '',
-  category: 'utilities',
+  category: 'subscriptions',
   frequency: 'monthly',
   nextDueDate: format(new Date(), 'yyyy-MM-dd'),
   bank: '',
@@ -84,35 +77,6 @@ const Recurring = () => {
   const [bankPopoverOpen, setBankPopoverOpen] = useState(false);
   const [paymentMethodPopoverOpen, setPaymentMethodPopoverOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchBankSuggestionsFromAllowances = async () => {
-      if (user?.$id) {
-        try {
-          const allowancesRes = await databaseService.getAllowances(user.$id);
-          const allowancesDocs = (allowancesRes.documents as unknown as Allowance[]);
-          
-          const uniqueBankNames = new Set<string>();
-          allowancesDocs.forEach(allowance => {
-            if (allowance.bankName) {
-              uniqueBankNames.add(allowance.bankName);
-            }
-          });
-
-          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
-            const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
-            return { name, icon: bankFromFile?.icon };
-          });
-          
-          setBankSuggestions(suggestions); // Suggestions will now only contain banks from allowances
-        } catch (error) {
-          console.error("Error fetching bank suggestions for recurring form:", error);
-        }
-      }
-    };
-    fetchBankSuggestionsFromAllowances();
-  }, [user]);
-
-
   const fetchRecurringExpenses = useCallback(async () => {
     if (!user?.$id) {
       setError("User not authenticated.");
@@ -122,8 +86,22 @@ const Recurring = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await databaseService.getRecurringExpenses(user.$id);
+      const [response, allowancesRes] = await Promise.all([
+        databaseService.getRecurringExpenses(user.$id),
+        databaseService.getAllowances(user.$id)
+      ]);
       setRecurringExpenses(response.documents as unknown as RecurringExpense[]);
+      
+      const uniqueBankNames = new Set<string>();
+      (allowancesRes.documents as any[]).forEach(allowance => {
+        if (allowance.bankName) uniqueBankNames.add(allowance.bankName);
+      });
+      const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
+        const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+        return { name, icon: bankFromFile?.icon };
+      });
+      setBankSuggestions(suggestions);
+
     } catch (err: any) {
       console.error("Error fetching recurring expenses:", err);
       setError("Failed to load recurring expenses. Please try again.");
@@ -138,15 +116,11 @@ const Recurring = () => {
   }, [fetchRecurringExpenses]);
 
   const handleCreateRecurring = async () => {
-    if (!user?.$id) {
-      toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
-      return;
-    }
+    if (!user?.$id) return;
     if (!createFormState.name || !createFormState.amount || !createFormState.nextDueDate) {
         toast({ title: "Missing Fields", description: "Name, amount, and next due date are required.", variant: "warning" });
         return;
     }
-
     setProcessingAction('create');
     try {
       const dataToSave: Omit<RecurringExpense, '$id' | '$createdAt' | '$updatedAt' | 'lastPaidDate'> = {
@@ -164,10 +138,8 @@ const Recurring = () => {
       await databaseService.createRecurringExpense(dataToSave);
       toast({ title: "Success", description: "Recurring expense added." });
       setShowCreateDialog(false);
-      setCreateFormState(initialRecurringFormState);
       fetchRecurringExpenses();
     } catch (err: any) {
-      console.error("Error creating recurring expense:", err);
       toast({ title: "Error", description: err.message || "Failed to add recurring expense.", variant: "destructive" });
     } finally {
       setProcessingAction(null);
@@ -175,16 +147,12 @@ const Recurring = () => {
   };
 
   const handleToggleActive = async (id: string, currentIsActive: boolean) => {
-    if (!id) return;
     setProcessingAction(id);
     try {
       await databaseService.updateRecurringExpense(id, { isActive: !currentIsActive });
-      setRecurringExpenses(prev => 
-        prev.map(exp => exp.$id === id ? { ...exp, isActive: !currentIsActive } : exp)
-      );
       toast({ title: "Success", description: `Expense ${!currentIsActive ? 'activated' : 'paused'}.` });
+      fetchRecurringExpenses();
     } catch (err: any) {
-      console.error("Error updating recurring expense status:", err);
       toast({ title: "Error", description: err.message || "Failed to update status.", variant: "destructive" });
     } finally {
       setProcessingAction(null);
@@ -192,15 +160,13 @@ const Recurring = () => {
   };
 
   const handleDeleteRecurring = async (id: string) => {
-    if (!id) return;
     if (!window.confirm("Are you sure you want to delete this recurring expense? This action cannot be undone.")) return;
     setProcessingAction(id);
     try {
       await databaseService.deleteRecurringExpense(id);
-      setRecurringExpenses(prev => prev.filter(exp => exp.$id !== id));
       toast({ title: "Success", description: "Recurring expense deleted." });
+      fetchRecurringExpenses();
     } catch (err: any) {
-      console.error("Error deleting recurring expense:", err);
       toast({ title: "Error", description: err.message || "Failed to delete expense.", variant: "destructive" });
     } finally {
       setProcessingAction(null);
@@ -223,18 +189,14 @@ const Recurring = () => {
   };
   
   const handleUpdateRecurring = async () => {
-    if (!editingExpenseId || !user?.$id) {
-        toast({ title: "Error", description: "Cannot update expense. Invalid data.", variant: "destructive" });
-        return;
-    }
-     if (!editFormState.name || !editFormState.amount || !editFormState.nextDueDate) {
+    if (!editingExpenseId || !user?.$id) return;
+    if (!editFormState.name || !editFormState.amount || !editFormState.nextDueDate) {
         toast({ title: "Missing Fields", description: "Name, amount, and next due date are required.", variant: "warning" });
         return;
     }
-
     setProcessingAction(editingExpenseId);
     try {
-        const dataToUpdate: Partial<Omit<RecurringExpense, '$id' | 'userId' | '$createdAt' | '$updatedAt' | 'isActive' | 'lastPaidDate'>> = {
+        await databaseService.updateRecurringExpense(editingExpenseId, {
             name: editFormState.name,
             amount: parseFloat(editFormState.amount),
             category: editFormState.category,
@@ -243,30 +205,94 @@ const Recurring = () => {
             bank: editFormState.bank || undefined,
             paymentMethod: editFormState.paymentMethod || undefined,
             notes: editFormState.notes || undefined,
-        };
-        await databaseService.updateRecurringExpense(editingExpenseId, dataToUpdate);
+        });
         toast({ title: "Success", description: "Recurring expense updated."});
         setShowEditDialog(false);
-        setEditingExpenseId(null);
         fetchRecurringExpenses();
     } catch (err:any) {
-        console.error("Error updating recurring expense:", err);
         toast({ title: "Error", description: err.message || "Failed to update expense.", variant: "destructive"});
     } finally {
         setProcessingAction(null);
     }
   };
 
+  const handleMarkAsPaid = async (re: RecurringExpense) => {
+    if (!user?.$id) return;
+    setProcessingAction(re.$id!);
+    try {
+      let dueDate = parseISO(re.nextDueDate);
+      if (!isValid(dueDate)) throw new Error("Invalid due date");
 
-  const getFrequencyColor = (frequency: string) => {
-    switch (frequency) {
-      case 'daily': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'weekly': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'monthly': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'yearly': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+      // Create the expense transaction
+      await databaseService.createExpense({
+        userId: user.$id,
+        name: re.name,
+        amount: re.amount,
+        date: dueDate.toISOString(),
+        category: re.category,
+        paymentMethod: re.paymentMethod,
+        bank: re.bank,
+        notes: re.notes || `Paid recurring: ${re.name}`,
+        isRecurringInstance: true,
+        currency: 'INR',
+        paidBy: user.name,
+        isSettled: true,
+      });
+
+      // Calculate the next due date
+      let newNextDueDate;
+      switch (re.frequency) {
+        case 'daily': newNextDueDate = addDays(dueDate, 1); break;
+        case 'weekly': newNextDueDate = addWeeks(dueDate, 1); break;
+        case 'monthly': newNextDueDate = addMonths(dueDate, 1); break;
+        case 'yearly': newNextDueDate = addYears(dueDate, 1); break;
+        default: newNextDueDate = addMonths(dueDate, 1);
+      }
+
+      // Update the recurring expense template
+      await databaseService.updateRecurringExpense(re.$id!, {
+        nextDueDate: newNextDueDate.toISOString(),
+        lastPaidDate: new Date().toISOString(),
+      });
+
+      toast({ title: "Success", description: `${re.name} marked as paid.` });
+      fetchRecurringExpenses();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to mark as paid.", variant: "destructive" });
+    } finally {
+      setProcessingAction(null);
     }
   };
+
+  const { overdue, dueThisWeek, upcoming } = useMemo(() => {
+    const today = startOfToday();
+    const endOfWeekDate = endOfWeek(today, { weekStartsOn: 1 });
+    
+    const overdue: RecurringExpense[] = [];
+    const dueThisWeek: RecurringExpense[] = [];
+    const upcoming: RecurringExpense[] = [];
+
+    recurringExpenses.forEach(re => {
+      if (!re.nextDueDate) return;
+      const dueDate = parseISO(re.nextDueDate);
+      if (!isValid(dueDate)) return;
+
+      if (isBefore(dueDate, today)) {
+        overdue.push(re);
+      } else if (isWithinInterval(dueDate, { start: today, end: endOfWeekDate })) {
+        dueThisWeek.push(re);
+      } else {
+        upcoming.push(re);
+      }
+    });
+
+    // Sort each group by due date
+    overdue.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
+    dueThisWeek.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
+    upcoming.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
+
+    return { overdue, dueThisWeek, upcoming };
+  }, [recurringExpenses]);
 
   const getDaysUntilDue = (nextDueDateStr: string) => {
     const nextDate = parseISO(nextDueDateStr);
@@ -277,101 +303,116 @@ const Recurring = () => {
     return { days, label: `in ${days} day${days === 1 ? '' : 's'}` };
   };
 
-  const activeExpenses = recurringExpenses.filter(r => r.isActive);
-  const totalMonthlyAmount = activeExpenses
-    .filter(r => r.frequency === 'monthly')
-    .reduce((acc, r) => acc + r.amount, 0);
+  const renderExpenseList = (title: string, expensesToList: RecurringExpense[], showPayButton: boolean) => {
+    if (expensesToList.length === 0) return null;
 
-  const today = startOfToday();
-  const endOfCurrentCalendarWeek = endOfWeek(today, { weekStartsOn: 1 }); // Assuming week starts on Monday
-
-  const dueThisWeek = activeExpenses.filter(r => {
-    if (!r.nextDueDate) return false;
-    try {
-      const dueDate = parseISO(r.nextDueDate);
-      // Ensure the date is valid
-      if (!isValid(dueDate)) return false;
-      
-      // Check if the due date is on or after today AND on or before the end of the current calendar week.
-      return dueDate >= today && dueDate <= endOfCurrentCalendarWeek;
-    } catch {
-      return false; // Catch errors from parseISO if nextDueDate is malformed
-    }
-  });
-
-  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {expensesToList.map(expense => {
+            const dueDateInfo = getDaysUntilDue(expense.nextDueDate);
+            const bankDetails = expense.bank ? banksData.find(b => b.name.toLowerCase() === expense.bank!.toLowerCase()) : undefined;
+            const paymentAppDetail = expense.paymentMethod ? paymentAppsData.find(p => p.id.toLowerCase() === expense.paymentMethod!.toLowerCase() || p.name.toLowerCase() === expense.paymentMethod!.toLowerCase()) : undefined;
+            const { IconComponent: CategoryIcon, color: categoryColor, name: categoryName } = getCategoryDetails(expense.category);
+            const isProcessing = processingAction === expense.$id;
+
+            return (
+              <Card key={expense.$id} className={cn('transition-opacity', !expense.isActive && 'opacity-60')}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${categoryColor}20` }}>
+                        <CategoryIcon className="w-5 h-5" style={{ color: categoryColor }} />
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <h4 className="font-semibold text-md text-foreground truncate" title={expense.name}>{expense.name}</h4>
+                        <p className="text-xs text-muted-foreground capitalize">{categoryName}</p>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-lg font-bold">₹{expense.amount.toLocaleString()}</div>
+                      <Badge variant="outline" className="text-xs capitalize mt-0.5">{expense.frequency}</Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Next Due</div>
+                        <div className={cn("font-medium", dueDateInfo.days < 0 && "text-destructive")}>{format(parseISO(expense.nextDueDate), 'MMM dd, yyyy')}</div>
+                      </div>
+                    </div>
+                    {(bankDetails || paymentAppDetail) && (
+                      <div className="flex items-center gap-1.5">
+                        {bankDetails?.icon ? <img src={bankDetails.icon} alt={bankDetails.name} className="w-4 h-4 object-contain" /> : <CreditCard className="w-4 h-4 text-muted-foreground" />}
+                        <div>
+                          <div className="text-xs text-muted-foreground">{bankDetails ? 'Bank' : 'Method'}</div>
+                          <div className="font-medium truncate">{bankDetails?.name || paymentAppDetail?.name || expense.paymentMethod}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <TooltipProvider>
+                      <div className="flex items-center gap-1">
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEditDialog(expense)} disabled={isProcessing}><Edit className="w-4 h-4" /></Button>
+                        </TooltipTrigger><TooltipContent><p>Edit</p></TooltipContent></Tooltip>
+                        
+                        <Tooltip><TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive/90" onClick={() => handleDeleteRecurring(expense.$id!)} disabled={isProcessing}><Trash2 className="w-4 h-4" /></Button>
+                        </TooltipTrigger><TooltipContent><p>Delete</p></TooltipContent></Tooltip>
+
+                        <Tooltip><TooltipTrigger asChild>
+                          <Switch checked={expense.isActive} onCheckedChange={() => handleToggleActive(expense.$id!, expense.isActive)} disabled={isProcessing} />
+                        </TooltipTrigger><TooltipContent><p>{expense.isActive ? 'Pause' : 'Activate'}</p></TooltipContent></Tooltip>
+                      </div>
+                    </TooltipProvider>
+                    {showPayButton && expense.isActive && (
+                      <Button size="sm" onClick={() => handleMarkAsPaid(expense)} disabled={isProcessing}>
+                        {isProcessing ? 'Processing...' : 'Mark as Paid'}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     );
-  }
+  };
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4">
-        <AlertTriangle className="w-12 h-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold text-destructive mb-2">Error</h2>
-        <p className="text-muted-foreground mb-4 text-center">{error}</p>
-        <Button onClick={fetchRecurringExpenses}>Retry</Button>
-      </div>
-    );
-  }
-
-  const renderRecurringForm = (
-    formState: RecurringFormState, 
-    setFormState: React.Dispatch<React.SetStateAction<RecurringFormState>>,
-    formType: 'create' | 'edit'
-  ) => {
+  const renderRecurringForm = (formState: RecurringFormState, setFormState: React.Dispatch<React.SetStateAction<RecurringFormState>>, formType: 'create' | 'edit') => {
     const selectedBankData = bankSuggestions.find(b => b.name === formState.bank);
-    const selectedPaymentMethodData = formState.paymentMethod
-      ? paymentAppsData.find(p => p.id === formState.paymentMethod)
-      : undefined;
-
+    const selectedPaymentMethodData = formState.paymentMethod ? paymentAppsData.find(p => p.id === formState.paymentMethod) : undefined;
     return (
-      // Apply text-foreground to this wrapper to help with color inheritance in dark mode
       <div className="space-y-4 py-4 text-foreground">
-        <div>
-          <Label htmlFor={`${formType}-recurringName`}>Expense Name *</Label>
-          <Input 
-            id={`${formType}-recurringName`} 
-            value={formState.name} 
-            onChange={(e) => setFormState({ ...formState, name: e.target.value })} 
-            placeholder="e.g., Netflix Subscription" 
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor={`${formType}-recurringName`}>Expense Name *</Label>
+            <Input id={`${formType}-recurringName`} value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} placeholder="e.g., Netflix Subscription" />
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-recurringAmount`}>Amount (₹) *</Label>
+            <Input id={`${formType}-recurringAmount`} type="number" value={formState.amount} onChange={(e) => setFormState({ ...formState, amount: e.target.value })} placeholder="599" />
+          </div>
         </div>
-        <div>
-          <Label htmlFor={`${formType}-recurringAmount`}>Amount (₹) *</Label>
-          <Input 
-            id={`${formType}-recurringAmount`} 
-            type="number" 
-            value={formState.amount} 
-            onChange={(e) => setFormState({ ...formState, amount: e.target.value })} 
-            placeholder="599" 
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor={`${formType}-recurringCategory`}>Category</Label>
             <Select value={formState.category} onValueChange={(value) => setFormState({ ...formState, category: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categoriesData.map(category => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>{categoriesData.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div>
             <Label htmlFor={`${formType}-recurringFrequency`}>Frequency</Label>
             <Select value={formState.frequency} onValueChange={(value: 'daily' | 'weekly' | 'monthly' | 'yearly') => setFormState({ ...formState, frequency: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select frequency" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">Daily</SelectItem>
                 <SelectItem value="weekly">Weekly</SelectItem>
@@ -383,376 +424,89 @@ const Recurring = () => {
         </div>
         <div>
           <Label htmlFor={`${formType}-recurringNextDue`}>Next Due Date *</Label>
-          <Input 
-            id={`${formType}-recurringNextDue`} 
-            type="date" 
-            value={formState.nextDueDate} 
-            onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} 
-          />
+          <Input id={`${formType}-recurringNextDue`} type="date" value={formState.nextDueDate} onChange={(e) => setFormState({ ...formState, nextDueDate: e.target.value })} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label htmlFor={`${formType}-recurringBank`}>Bank (Optional)</Label>
-            <Popover open={bankPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')} onOpenChange={(open) => setBankPopoverOpen(open)}>
+            <Popover open={bankPopoverOpen} onOpenChange={setBankPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={bankPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')}
-                  className="w-full justify-between font-normal h-10 mt-1"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {selectedBankData?.icon && (
-                      <img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {formState.bank || "Select or type bank..."}
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10 mt-1">
+                  <div className="flex items-center gap-2 truncate">{selectedBankData?.icon && <img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain" />}<span className="truncate">{formState.bank || "Select or type bank..."}</span></div><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search bank or type new..."
-                    value={formState.bank}
-                    onValueChange={(searchValue) => setFormState({ ...formState, bank: searchValue })}
-                  />
-                  <CommandList>
-                    <CommandEmpty>
-                      {formState.bank ? `Add "${formState.bank}" as new bank` : "No bank found. Type to add."}
-                    </CommandEmpty>
-                    <CommandGroup>
-                      {bankSuggestions.map((suggestion) => (
-                        <CommandItem
-                          key={suggestion.name}
-                          value={suggestion.name}
-                          onSelect={(currentValue) => {
-                            setFormState({ ...formState, bank: currentValue });
-                            setBankPopoverOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formState.bank === suggestion.name ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {suggestion.icon && (
-                            <img src={suggestion.icon} alt={suggestion.name} className="w-4 h-4 object-contain mr-2" />
-                          )}
-                          {suggestion.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
+                <CommandInput placeholder="Search bank..." value={formState.bank} onValueChange={(val) => setFormState({...formState, bank: val})} />
+                <CommandList><CommandEmpty>No bank found.</CommandEmpty><CommandGroup>
+                  {bankSuggestions.map((s) => (<CommandItem key={s.name} value={s.name} onSelect={(val) => {setFormState({...formState, bank: val}); setBankPopoverOpen(false);}}><Check className={cn("mr-2 h-4 w-4", formState.bank === s.name ? "opacity-100" : "opacity-0")} />{s.icon && <img src={s.icon} alt={s.name} className="w-4 h-4 mr-2" />}{s.name}</CommandItem>))}
+                </CommandGroup></CommandList>
+              </Command></PopoverContent>
             </Popover>
           </div>
           <div>
             <Label htmlFor={`${formType}-recurringPaymentApp`}>Payment Method (Optional)</Label>
-            <Popover open={paymentMethodPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')} onOpenChange={(open) => setPaymentMethodPopoverOpen(open)}>
+            <Popover open={paymentMethodPopoverOpen} onOpenChange={setPaymentMethodPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={paymentMethodPopoverOpen && formType === (showCreateDialog ? 'create' : 'edit')}
-                  className="w-full justify-between font-normal h-10 mt-1"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {selectedPaymentMethodData?.icon && (
-                      <img src={selectedPaymentMethodData.icon} alt={selectedPaymentMethodData.name} className="w-4 h-4 object-contain flex-shrink-0 rounded" />
-                    )}
-                    <span className="truncate">
-                      {selectedPaymentMethodData?.name || "Select payment method..."}
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10 mt-1">
+                  <div className="flex items-center gap-2 truncate">{selectedPaymentMethodData?.icon && <img src={selectedPaymentMethodData.icon} alt={selectedPaymentMethodData.name} className="w-4 h-4 object-contain" />}<span className="truncate">{selectedPaymentMethodData?.name || "Select payment method..."}</span></div><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput placeholder="Search payment method..." />
-                  <CommandList>
-                    <CommandEmpty>No payment method found.</CommandEmpty>
-                    <CommandGroup>
-                      {paymentAppsData.map((app) => (
-                        <CommandItem
-                          key={app.id}
-                          value={app.name} 
-                          onSelect={() => {
-                            setFormState({ ...formState, paymentMethod: app.id }); 
-                            setPaymentMethodPopoverOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formState.paymentMethod === app.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {app.icon && (
-                            <img src={app.icon} alt={app.name} className="w-4 h-4 object-contain mr-2 rounded" />
-                          )}
-                          {app.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command>
+                <CommandInput placeholder="Search method..." />
+                <CommandList><CommandEmpty>No method found.</CommandEmpty><CommandGroup>
+                  {paymentAppsData.map((app) => (<CommandItem key={app.id} value={app.name} onSelect={() => {setFormState({...formState, paymentMethod: app.id}); setPaymentMethodPopoverOpen(false);}}><Check className={cn("mr-2 h-4 w-4", formState.paymentMethod === app.id ? "opacity-100" : "opacity-0")} />{app.icon && <img src={app.icon} alt={app.name} className="w-4 h-4 mr-2" />}{app.name}</CommandItem>))}
+                </CommandGroup></CommandList>
+              </Command></PopoverContent>
             </Popover>
           </div>
         </div>
-          <div>
+        <div>
           <Label htmlFor={`${formType}-recurringNotes`}>Notes (Optional)</Label>
-          <Input 
-            id={`${formType}-recurringNotes`} 
-            value={formState.notes} 
-            onChange={(e) => setFormState({ ...formState, notes: e.target.value })} 
-            placeholder="Additional details" 
-          />
+          <Input id={`${formType}-recurringNotes`} value={formState.notes} onChange={(e) => setFormState({ ...formState, notes: e.target.value })} placeholder="Additional details" />
         </div>
       </div>
     );
   };
 
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div></div>;
+  }
+
+  if (error) {
+    return <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] p-4"><AlertTriangle className="w-12 h-12 text-destructive mb-4" /><h2 className="text-xl font-semibold text-destructive mb-2">Error</h2><p className="text-muted-foreground mb-4 text-center">{error}</p><Button onClick={fetchRecurringExpenses}>Retry</Button></div>;
+  }
+
   return (
-    <div className="space-y-4 lg:space-y-6 p-4 lg:p-6">
+    <div className="space-y-6 p-4 lg:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Recurring Expenses</h1>
           <p className="text-muted-foreground text-sm lg:text-base">Manage your regular bills and subscriptions</p>
         </div>
-        {/* Create Dialog */}
-        <Dialog 
-          open={showCreateDialog} 
-          onOpenChange={(isOpen) => { 
-            setShowCreateDialog(isOpen); 
-            if (!isOpen) {
-              setCreateFormState(initialRecurringFormState); 
-              setBankPopoverOpen(false); // Reset bank popover open state
-              setPaymentMethodPopoverOpen(false); // Reset payment method popover open state
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto" onClick={() => { setCreateFormState(initialRecurringFormState); setShowCreateDialog(true); }}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Recurring
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="text-foreground"> {/* Added text-foreground */}
-            <DialogHeader>
-              <DialogTitle>Add New Recurring Expense</DialogTitle>
-            </DialogHeader>
-            {renderRecurringForm(createFormState, setCreateFormState, 'create')}
-            <DialogFooter>
-                <DialogClose asChild><Button variant="outline" disabled={processingAction === 'create'}>Cancel</Button></DialogClose>
-                <Button onClick={handleCreateRecurring} disabled={processingAction === 'create'}>
-                    {processingAction === 'create' ? 'Adding...' : 'Add Recurring Expense'}
-                </Button>
-            </DialogFooter>
-          </DialogContent>
+        <Dialog open={showCreateDialog} onOpenChange={(isOpen) => { setShowCreateDialog(isOpen); if (!isOpen) setCreateFormState(initialRecurringFormState); }}>
+          <DialogTrigger asChild><Button className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" />Add Recurring</Button></DialogTrigger>
+          <DialogContent className="text-foreground"><DialogHeader><DialogTitle>Add New Recurring Expense</DialogTitle></DialogHeader>{renderRecurringForm(createFormState, setCreateFormState, 'create')}<DialogFooter><DialogClose asChild><Button variant="outline" disabled={processingAction === 'create'}>Cancel</Button></DialogClose><Button onClick={handleCreateRecurring} disabled={processingAction === 'create'}>{processingAction === 'create' ? 'Adding...' : 'Add Recurring Expense'}</Button></DialogFooter></DialogContent>
         </Dialog>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"><Calendar className="w-5 h-5" /></div>
-              <div>
-                <div className="text-sm text-muted-foreground">Est. Monthly Total</div>
-                <div className="text-xl font-bold">₹{totalMonthlyAmount.toLocaleString()}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"><Play className="w-5 h-5" /></div>
-              <div>
-                <div className="text-sm text-muted-foreground">Active</div>
-                <div className="text-xl font-bold">{activeExpenses.length}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 lg:p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"><Calendar className="w-5 h-5" /></div>
-              <div>
-                <div className="text-sm text-muted-foreground">Due This Week</div>
-                <div className="text-xl font-bold">{dueThisWeek.length}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Due This Week Section */}
-      {dueThisWeek.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Due This Week</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {dueThisWeek.map((expense) => {
-                  const dueDateInfo = getDaysUntilDue(expense.nextDueDate);
-                  return (
-                    <div key={expense.$id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                      <div>
-                        <div className="font-medium">{expense.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {dueDateInfo.label} • ₹{expense.amount.toLocaleString()}
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" className="text-xs">Mark as Paid</Button> {/* Placeholder */}
-                    </div>
-                  );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      {recurringExpenses.length === 0 && !isLoading ? (
+         <Card><CardContent className="p-6 text-center text-muted-foreground"><Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />No recurring expenses found. <br/> Add your subscriptions and regular bills to get started.</CardContent></Card>
+      ) : (
+        <div className="space-y-6">
+          {renderExpenseList("Overdue", overdue, true)}
+          {renderExpenseList("Due This Week", dueThisWeek, true)}
+          {renderExpenseList("Upcoming", upcoming, false)}
+        </div>
       )}
-
-      {/* Recurring Expenses List */}
-      {recurringExpenses.length === 0 && !isLoading && (
-         <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-                <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                No recurring expenses found. <br/> Add your subscriptions and regular bills to get started.
-            </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-        {recurringExpenses.map((expense) => {
-          const dueDateInfo = getDaysUntilDue(expense.nextDueDate);
-          const bankDetails = expense.bank ? banksData.find(b => b.name.toLowerCase() === expense.bank!.toLowerCase()) : undefined;
-          const paymentAppDetail = expense.paymentMethod ? paymentAppsData.find(p => p.id.toLowerCase() === expense.paymentMethod!.toLowerCase() || p.name.toLowerCase() === expense.paymentMethod!.toLowerCase()) : undefined;
-          const { IconComponent: CategoryIcon, color: categoryColor, name: categoryName } = getCategoryDetails(expense.category);
-
-          return (
-            <Card key={expense.$id} className={!expense.isActive ? 'opacity-60' : ''}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{expense.name}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getFrequencyColor(expense.frequency) + " capitalize"}>
-                      {expense.frequency}
-                    </Badge>
-                    <Switch
-                      checked={expense.isActive}
-                      onCheckedChange={() => handleToggleActive(expense.$id!, expense.isActive)}
-                      disabled={processingAction === expense.$id}
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">Amount</div>
-                      <div className="text-xl font-bold">₹{expense.amount.toLocaleString()}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Next Due</div>
-                      <div className="font-medium">{format(parseISO(expense.nextDueDate), 'MMM dd, yyyy')}</div>
-                      <div className={`text-xs ${dueDateInfo.days < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        {dueDateInfo.label}
-                      </div>
-                    </div>
-                  </div>
-                  {(expense.bank || expense.paymentMethod) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {expense.bank && (
-                        <div>
-                          <div className="text-sm text-muted-foreground">Bank</div>
-                          <div className="font-medium flex items-center gap-2">
-                            {bankDetails?.icon && (
-                              <img src={bankDetails.icon} alt={bankDetails.name} className="w-4 h-4 object-contain" />
-                            )}
-                            <span>{expense.bank}</span>
-                          </div>
-                        </div>
-                      )}
-                      {expense.paymentMethod && (
-                        <div>
-                          <div className="text-sm text-muted-foreground">Payment Method</div>
-                          <div className="font-medium flex items-center gap-2">
-                            {paymentAppDetail?.icon ? (
-                              <img src={paymentAppDetail.icon} alt={paymentAppDetail.name} className="w-4 h-4 object-contain rounded" />
-                            ) : (
-                              <CreditCard className="w-4 h-4 text-muted-foreground" /> // Fallback icon
-                            )}
-                            <span>{paymentAppDetail?.name || expense.paymentMethod}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {expense.category && (
-                    <div>
-                      <div className="text-sm text-muted-foreground">Category</div>
-                      <Badge variant="outline" className="capitalize flex items-center gap-1.5" style={{ borderColor: categoryColor, color: categoryColor }}>
-                        <CategoryIcon className="w-3 h-3" /> 
-                        {categoryName}
-                      </Badge>
-                    </div>
-                  )}
-                  {expense.notes && <div><div className="text-sm text-muted-foreground">Notes</div><p className="text-sm">{expense.notes}</p></div>}
-                  {expense.lastPaidDate && <div><div className="text-sm text-muted-foreground">Last Paid</div><div className="text-sm">{format(parseISO(expense.lastPaidDate), 'MMM dd, yyyy')}</div></div>}
-                  
-                  <div className="flex gap-2 pt-2 border-t border-border/50">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenEditDialog(expense)} disabled={processingAction === expense.$id}>
-                      <Edit className="w-3 h-3 mr-1" /> Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleDeleteRecurring(expense.$id!)} disabled={processingAction === expense.$id}>
-                      <Trash2 className="w-3 h-3 mr-1" /> Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
       
-      {/* Edit Dialog */}
       {editingExpenseId && (
-        <Dialog 
-          open={showEditDialog} 
-          onOpenChange={(isOpen) => { 
-            setShowEditDialog(isOpen); 
-            if (!isOpen) {
-              setEditingExpenseId(null); 
-              setEditFormState(initialRecurringFormState); // Reset edit form state
-              setBankPopoverOpen(false); // Reset bank popover open state
-              setPaymentMethodPopoverOpen(false); // Reset payment method popover open state
-            }
-          }}
-        >
-            <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg"> {/* Modified */}
-                <DialogHeader className="p-6 pb-4 border-b">
-                  <DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow overflow-y-auto px-6 py-4">
-                  {renderRecurringForm(editFormState, setEditFormState, 'edit')}
-                </div>
+        <Dialog open={showEditDialog} onOpenChange={(isOpen) => { setShowEditDialog(isOpen); if (!isOpen) setEditingExpenseId(null); }}>
+            <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg">
+                <DialogHeader className="p-6 pb-4 border-b"><DialogTitle>Edit Recurring Expense: {editFormState.name}</DialogTitle></DialogHeader>
+                <div className="flex-grow overflow-y-auto px-6 py-4">{renderRecurringForm(editFormState, setEditFormState, 'edit')}</div>
                 <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
-                    <DialogClose asChild>
-                        <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={processingAction === editingExpenseId}>Cancel</Button>
-                    </DialogClose>
-                    <Button onClick={handleUpdateRecurring} className="w-full sm:w-auto" disabled={processingAction === editingExpenseId}>
-                        {processingAction === editingExpenseId ? "Saving..." : "Save Changes"}
-                    </Button>
+                    <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!!processingAction}>Cancel</Button></DialogClose>
+                    <Button onClick={handleUpdateRecurring} className="w-full sm:w-auto" disabled={!!processingAction}>{processingAction === editingExpenseId ? "Saving..." : "Save Changes"}</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
