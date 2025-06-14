@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import * as LucideIcons from 'lucide-react';
 import categoriesData from '@/data/categories.json';
-import { Dialog,DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog,DialogTrigger,DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { databaseService } from '@/lib/appwrite';
+import { databaseService, COLLECTIONS } from '@/lib/appwrite';
 import { RecurringExpense } from '@/types/expense';
 import { toast } from '@/hooks/use-toast';
 import { format, differenceInDays, parseISO, isValid, startOfWeek, endOfWeek, startOfToday, isBefore, isWithinInterval, addDays, addWeeks, addMonths, addYears } from 'date-fns';
@@ -21,6 +21,11 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+// Helper function to generate a unique ID for a recurring instance
+const generateRecurringInstanceId = (recurringExpenseId: string, date: Date): string => {
+  return `rec_${recurringExpenseId}_${format(date, 'yyyyMMdd')}`;
+};
 
 const getCategoryDetails = (categoryId: string | undefined) => {
   const defaultIcon = LucideIcons.Briefcase;
@@ -123,7 +128,7 @@ const Recurring = () => {
     }
     setProcessingAction('create');
     try {
-      const dataToSave: Omit<RecurringExpense, '$id' | '$createdAt' | '$updatedAt' | 'lastPaidDate'> = {
+      await databaseService.createRecurringExpense({
         userId: user.$id,
         name: createFormState.name,
         amount: parseFloat(createFormState.amount),
@@ -134,8 +139,7 @@ const Recurring = () => {
         bank: createFormState.bank || undefined,
         paymentMethod: createFormState.paymentMethod || undefined,
         notes: createFormState.notes || undefined,
-      };
-      await databaseService.createRecurringExpense(dataToSave);
+      });
       toast({ title: "Success", description: "Recurring expense added." });
       setShowCreateDialog(false);
       fetchRecurringExpenses();
@@ -146,13 +150,75 @@ const Recurring = () => {
     }
   };
 
+  const handleMarkAsPaid = async (re: RecurringExpense) => {
+    if (!user?.$id || !re.$id) return;
+    setProcessingAction(re.$id);
+    try {
+      const dueDate = parseISO(re.nextDueDate);
+      if (!isValid(dueDate)) throw new Error("Invalid due date");
+
+      const instanceId = generateRecurringInstanceId(re.$id, dueDate);
+
+      // IDEMPOTENCY CHECK
+      try {
+        await databaseService.getDocument(COLLECTIONS.EXPENSES, instanceId);
+        toast({ title: "Already Paid", description: "This bill has already been logged for this due date.", variant: "default" });
+      } catch (error: any) {
+        if (error.code === 404) {
+          // Transaction does not exist, so we can create it
+          await databaseService.createDocument(COLLECTIONS.EXPENSES, {
+            userId: user.$id,
+            name: re.name,
+            amount: re.amount,
+            date: dueDate.toISOString(),
+            category: re.category,
+            paymentMethod: re.paymentMethod,
+            bank: re.bank,
+            notes: re.notes || `Paid recurring: ${re.name}`,
+            isRecurringInstance: true,
+            paidBy: user.name,
+            isSettled: true,
+            currency: 'INR',
+          }, instanceId); // Use the predictable ID
+          toast({ title: "Success", description: `${re.name} marked as paid.` });
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
+
+      // Calculate the next due date
+      let newNextDueDate;
+      switch (re.frequency) {
+        case 'daily': newNextDueDate = addDays(dueDate, 1); break;
+        case 'weekly': newNextDueDate = addWeeks(dueDate, 1); break;
+        case 'monthly': newNextDueDate = addMonths(dueDate, 1); break;
+        case 'yearly': newNextDueDate = addYears(dueDate, 1); break;
+        default: newNextDueDate = addMonths(dueDate, 1);
+      }
+
+      // Update the recurring expense template
+      await databaseService.updateRecurringExpense(re.$id, {
+        nextDueDate: newNextDueDate.toISOString(),
+        lastPaidDate: new Date().toISOString(),
+      });
+
+      fetchRecurringExpenses();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to mark as paid.", variant: "destructive" });
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+  
   const handleToggleActive = async (id: string, currentIsActive: boolean) => {
+    if (!id) return;
     setProcessingAction(id);
     try {
       await databaseService.updateRecurringExpense(id, { isActive: !currentIsActive });
       toast({ title: "Success", description: `Expense ${!currentIsActive ? 'activated' : 'paused'}.` });
       fetchRecurringExpenses();
     } catch (err: any) {
+      console.error("Error updating recurring expense status:", err);
       toast({ title: "Error", description: err.message || "Failed to update status.", variant: "destructive" });
     } finally {
       setProcessingAction(null);
@@ -160,6 +226,7 @@ const Recurring = () => {
   };
 
   const handleDeleteRecurring = async (id: string) => {
+    if (!id) return;
     if (!window.confirm("Are you sure you want to delete this recurring expense? This action cannot be undone.")) return;
     setProcessingAction(id);
     try {
@@ -167,6 +234,7 @@ const Recurring = () => {
       toast({ title: "Success", description: "Recurring expense deleted." });
       fetchRecurringExpenses();
     } catch (err: any) {
+      console.error("Error deleting recurring expense:", err);
       toast({ title: "Error", description: err.message || "Failed to delete expense.", variant: "destructive" });
     } finally {
       setProcessingAction(null);
@@ -216,54 +284,6 @@ const Recurring = () => {
     }
   };
 
-  const handleMarkAsPaid = async (re: RecurringExpense) => {
-    if (!user?.$id) return;
-    setProcessingAction(re.$id!);
-    try {
-      let dueDate = parseISO(re.nextDueDate);
-      if (!isValid(dueDate)) throw new Error("Invalid due date");
-
-      // Create the expense transaction
-      await databaseService.createExpense({
-        userId: user.$id,
-        name: re.name,
-        amount: re.amount,
-        date: dueDate.toISOString(),
-        category: re.category,
-        paymentMethod: re.paymentMethod,
-        bank: re.bank,
-        notes: re.notes || `Paid recurring: ${re.name}`,
-        isRecurringInstance: true,
-        currency: 'INR',
-        paidBy: user.name,
-        isSettled: true,
-      });
-
-      // Calculate the next due date
-      let newNextDueDate;
-      switch (re.frequency) {
-        case 'daily': newNextDueDate = addDays(dueDate, 1); break;
-        case 'weekly': newNextDueDate = addWeeks(dueDate, 1); break;
-        case 'monthly': newNextDueDate = addMonths(dueDate, 1); break;
-        case 'yearly': newNextDueDate = addYears(dueDate, 1); break;
-        default: newNextDueDate = addMonths(dueDate, 1);
-      }
-
-      // Update the recurring expense template
-      await databaseService.updateRecurringExpense(re.$id!, {
-        nextDueDate: newNextDueDate.toISOString(),
-        lastPaidDate: new Date().toISOString(),
-      });
-
-      toast({ title: "Success", description: `${re.name} marked as paid.` });
-      fetchRecurringExpenses();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to mark as paid.", variant: "destructive" });
-    } finally {
-      setProcessingAction(null);
-    }
-  };
-
   const { overdue, dueThisWeek, upcoming } = useMemo(() => {
     const today = startOfToday();
     const endOfWeekDate = endOfWeek(today, { weekStartsOn: 1 });
@@ -286,7 +306,6 @@ const Recurring = () => {
       }
     });
 
-    // Sort each group by due date
     overdue.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
     dueThisWeek.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
     upcoming.sort((a, b) => parseISO(a.nextDueDate).getTime() - parseISO(b.nextDueDate).getTime());
