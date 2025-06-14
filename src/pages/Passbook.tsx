@@ -338,7 +338,7 @@ const Passbook = () => {
   const selectedPaymentMethodForFilter = uniquePaymentMethods.find(pm => pm.id === filterPaymentMethod);
 
   return (
-    <div className="space-y-6 p-4 lg:p-8">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
           <BookOpenText className="w-8 h-8 text-primary" />

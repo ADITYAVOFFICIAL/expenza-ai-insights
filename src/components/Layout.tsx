@@ -8,7 +8,7 @@ const Layout = () => {
     <div className="min-h-screen bg-background">
       <div className="flex w-full">
         <Sidebar />
-        <div className="flex-1 lg:ml-72">
+        <div className="flex-1 md:ml-56 lg:ml-64 xl:ml-72 2xl:ml-80">
           <Header />
           <main className="p-4 lg:p-6 min-h-[calc(100vh-4rem)]">
             <div className="w-full">
