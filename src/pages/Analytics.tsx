@@ -33,9 +33,11 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
   endOfDay,
+  endOfWeek, // Added for trend calculation
 } from 'date-fns';
 import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
 import { useIsMobile } from '@/hooks/use-mobile'; // Add this if not already present
+
 interface MonthlyTrend {
   month: string;
   expenses: number;
@@ -79,6 +81,10 @@ const Analytics = () => {
   const [error, setError] = useState<string | null>(null); // For page data
 
   const [timeFilter, setTimeFilter] = useState('thisMonth'); // Existing
+  const [customDate, setCustomDate] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(),
+  });
   const [expenses, setExpenses] = useState<Expense[]>([]); // Existing
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]); // Existing
   const [allowances, setAllowances] = useState<Allowance[]>([]); // Existing
@@ -152,6 +158,12 @@ const Analytics = () => {
         end = endOfYear(now);
         label = "This Year";
         break;
+      case 'custom':
+        const customSelectedDate = new Date(customDate.year, customDate.month);
+        start = startOfMonth(customSelectedDate);
+        end = endOfMonth(customSelectedDate);
+        label = format(customSelectedDate, 'MMMM yyyy');
+        break;
       case 'thisMonth':
       default:
         start = startOfMonth(now);
@@ -159,7 +171,7 @@ const Analytics = () => {
         label = "This Month";
     }
     return { start, end, label };
-  }, [timeFilter]);
+  }, [timeFilter, customDate]);
 
   // Define processedRecurringInstances first
   const processedRecurringInstances = useMemo(() => {
@@ -249,12 +261,6 @@ const Analytics = () => {
     const currentFilteredExpenses = combinedExpensesForFilterPeriod;
     
     const currentFilteredAllowances = filteredAllowancesForPeriod;
-    // const currentFilteredAllowances = allowances.filter(allow => {
-    //   const allowDateStr = allow.nextReceived || allow.$createdAt; // Use nextReceived first, fallback to createdAt
-    //   if (!allowDateStr) return false;
-    //   const allowDate = parseISO(allowDateStr);
-    //   return isValid(allowDate) && isWithinInterval(allowDate, { start: startDate, end: endDate });
-    // });
 
     // Monthly Trends (Expenses, Income, Savings)
     const trends: { [key: string]: { expenses: number, income: number } } = {};
@@ -448,9 +454,53 @@ const Analytics = () => {
 
     setLoading(false); // Main analytics data loaded
 
-  }, [combinedExpensesForFilterPeriod, filteredAllowancesForPeriod, dateInterval, user, expenses, recurringExpenses, allowances, loading]); // Dependencies for recalculating analytics
+  }, [combinedExpensesForFilterPeriod, filteredAllowancesForPeriod, dateInterval, user, expenses, recurringExpenses, allowances, goals, loading]); // Dependencies for recalculating analytics
 
+  const earliestYear = useMemo(() => {
+    if (loading && expenses.length === 0 && allowances.length === 0) {
+      return new Date().getFullYear() - 5;
+    }
+    const allDates = [
+      ...expenses.map(e => e.date),
+      ...allowances.map(a => a.nextReceived || a.$createdAt)
+    ].map(d => d ? parseISO(d) : null).filter((d): d is Date => d !== null && isValid(d));
 
+    if (allDates.length === 0) {
+      return new Date().getFullYear() - 5;
+    }
+
+    const earliest = Math.min(...allDates.map(d => d.getFullYear()));
+    return isFinite(earliest) ? earliest : new Date().getFullYear() - 5;
+  }, [expenses, allowances, loading]);
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+
+  const yearOptions = useMemo(() => {
+    const years = [];
+    for (let y = currentYear; y >= earliestYear; y--) {
+      years.push(y);
+    }
+    return years;
+  }, [currentYear, earliestYear]);
+
+  const monthOptions = useMemo(() => {
+    const isCurrentYearSelected = customDate.year === currentYear;
+    const monthsToShow = isCurrentYearSelected ? currentMonth + 1 : 12;
+
+    return Array.from({ length: monthsToShow }, (_, i) => ({
+      value: i.toString(),
+      label: format(new Date(2000, i, 1), 'MMMM')
+    }));
+  }, [customDate.year, currentYear, currentMonth]);
+  
+  // Effect to adjust the month if the year changes and the selected month becomes invalid (i.e., a future month)
+  useEffect(() => {
+    const isCurrentYearSelected = customDate.year === currentYear;
+    if (isCurrentYearSelected && customDate.month > currentMonth) {
+      setCustomDate(prev => ({ ...prev, month: currentMonth }));
+    }
+  }, [customDate.year, currentYear, currentMonth, customDate.month]);
 
   if (loading && monthlyTrends.length === 0) { // Adjusted loading condition
     return (
@@ -482,7 +532,7 @@ const Analytics = () => {
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground">Analytics</h1>
           <p className="text-muted-foreground text-sm lg:text-base">Comprehensive insights into your financial health</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={timeFilter} onValueChange={setTimeFilter}>
             <SelectTrigger className="w-40 dark:text-foreground">
               <SelectValue placeholder="Time period" />
@@ -492,8 +542,42 @@ const Analytics = () => {
               <SelectItem value="lastMonth">Last Month</SelectItem>
               <SelectItem value="last3Months">Last 3 Months</SelectItem>
               <SelectItem value="thisYear">This Year</SelectItem>
+              <SelectItem value="custom">Select Month...</SelectItem>
             </SelectContent>
           </Select>
+
+          {timeFilter === 'custom' && (
+            <>
+              <Select
+                value={customDate.year.toString()}
+                onValueChange={(val) => setCustomDate(prev => ({ ...prev, year: parseInt(val) }))}
+              >
+                <SelectTrigger className="w-[7rem] dark:text-foreground">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select
+                value={customDate.month.toString()}
+                onValueChange={(val) => setCustomDate(prev => ({ ...prev, month: parseInt(val) }))}
+              >
+                <SelectTrigger className="w-[9rem] dark:text-foreground">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(month => (
+                    <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+
           <Button 
             variant="outline" 
             size="sm" 
@@ -569,34 +653,18 @@ const Analytics = () => {
           </CardContent>
         </Card>
         
-        {/* === THIS IS THE CORRECTED FINANCIAL TRENDS CHART === */}
-        {/* The ID for export should be inside FinancialTrendsChart or on a div wrapping its chart area */}
-        {/* The FinancialTrendsChart component renders its own Card, so no need to wrap CardContent with p-0 if FinancialTrendsChart handles its own padding. */}
-        {/* If FinancialTrendsChart has its own Card, you might not need to wrap it in another Card unless for layout (xl:col-span-2) */}
-        <div className="xl:col-span-2" id="analyticsChartFinancialTrendsWrapper"> {/* Wrapper for layout and potential export ID */}
+        <div className="xl:col-span-2" id="analyticsChartFinancialTrendsWrapper">
             <FinancialTrendsChart data={monthlyTrends} />
         </div>
-        {/* === REMOVE THE OLD FINANCIAL TRENDS CHART THAT WAS HERE === */}
-        {/* 
-          The old card structure that was here:
-          <Card className="xl:col-span-2">
-            <CardHeader>...</CardHeader>
-            <CardContent id="analyticsChartFinancialTrends">...</CardContent>
-          </Card>
-          SHOULD BE COMPLETELY REMOVED.
-        */}
-{/* Savings Tracking Chart */}
+
         <Card className="xl:col-span-2">
-          {/* The ID for export should be inside SavingsTrackingChart or on a div wrapping its chart area */}
           <CardContent className="p-0" id="analyticsChartSavingsTrackingWrapper"> 
             <SavingsTrackingChart weeklyData={savingsChartData.weekly} monthlyData={savingsChartData.monthly} />
           </CardContent>
         </Card>
 
-        {/* Spending by Category Chart */}
         <Card className="xl:col-span-2">
           <CardHeader><CardTitle className="text-lg">Spending by Category Over Time</CardTitle></CardHeader>
-          {/* The ID for export should be inside SavingsCategoryChart or on a div wrapping its chart area */}
           <CardContent className="p-4" id="analyticsChartSpendingByCategoryWrapper"> 
             {savingsCategoryData.length > 0 && categorySpending.length > 0 ? (
                 <SavingsCategoryChart data={savingsCategoryData} categories={categorySpending.map(c => c.category.toLowerCase().replace(/\s+/g, ''))} />
@@ -609,8 +677,6 @@ const Analytics = () => {
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         analyticsData={analyticsExportData}
-        // Ensure chartConfigs in AnalyticsExportDialog use IDs like 'financialTrendsChartContainer' (if ID is inside the component)
-        // or 'analyticsChartFinancialTrendsWrapper' if the ID is on the wrapper div.
       />
     </div>
   );

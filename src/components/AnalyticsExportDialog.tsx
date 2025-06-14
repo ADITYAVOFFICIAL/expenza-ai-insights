@@ -105,37 +105,6 @@ const getPeriodDetailString = (timeFilterLabel: string | undefined): string => {
 };
 
 
-const convertToCSV = (data: any[], sectionTitle?: string): string => {
-  if (!data || data.length === 0) return sectionTitle ? `${sectionTitle}\nNo data available\n\n` : "";
-  
-  // Filter out internal properties like isRecurring for CSV
-  const dataForCsv = data.map(row => {
-    const { isRecurring, ...rest } = row; // eslint-disable-line @typescript-eslint/no-unused-vars
-    return rest;
-  });
-
-  if (dataForCsv.length === 0 || Object.keys(dataForCsv[0]).length === 0) return sectionTitle ? `${sectionTitle}\nNo data available\n\n` : "";
-
-
-  const header = Object.keys(dataForCsv[0]).join(',');
-  const rows = dataForCsv.map(row => {
-    return Object.values(row).map(value => {
-      const stringValue = String(value === null || value === undefined ? '' : value);
-      if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
-        return `"${stringValue.replace(/"/g, '""')}"`;
-      }
-      return stringValue;
-    }).join(',');
-  });
-  
-  let csvString = "";
-  if (sectionTitle) {
-    csvString += `${sectionTitle}\n`;
-  }
-  csvString += header + '\n' + rows.join('\n') + '\n\n';
-  return csvString;
-};
-
 const downloadFile = (blob: Blob, filename: string): void => {
   const link = document.createElement("a");
   if (link.download !== undefined) {
@@ -163,7 +132,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
   const [selectedDataSets, setSelectedDataSets] = useState<string[]>(
     effectiveDataSetOptions.filter(opt => opt.defaultSelected !== false).map(opt => opt.id)
   );
-  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf' | 'xlsx'>('csv');
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'xlsx'>('pdf');
   const [includeGraphs, setIncludeGraphs] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
@@ -180,7 +149,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
   const getFilename = (extension: string): string => {
     const timeFilterPart = analyticsData?.timeFilterLabel.replace(/\s+/g, '_') || 'data';
     const datePart = new Date().toISOString().split('T')[0];
-    return `DigiSamahārta_Analytics_${timeFilterPart}_${datePart}.${extension}`;
+    return `DigiSamahārta_Analytics_for_${datePart}.${extension}`;
   };
 
   const captureChartAsImage = async (chartId: string): Promise<string | null> => {
@@ -203,81 +172,6 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
       toast({ title: "Chart Capture Error", description: `Could not capture ${chartId}.`, variant: "destructive" });
       return null;
     }
-  };
-
-  const exportToCSVHandler = () => {
-    if (!analyticsData) return;
-    let combinedCsvString = `DigiSamahārta Analytics Report\n`;
-    combinedCsvString += `Time Period: ${analyticsData.timeFilterLabel}\n`;
-    combinedCsvString += `Export Date: ${new Date().toLocaleDateString()}\n\n`;
-    
-    const reportPeriodDetail = getPeriodDetailString(analyticsData.timeFilterLabel);
-
-    if (selectedDataSets.includes('summaryMetrics') && analyticsData.summaryMetrics) {
-      const processedSummaryMetrics = analyticsData.summaryMetrics.map(m => ({
-        Metric: m.label,
-        Value: m.value,
-        Details: (m.description && m.description.toLowerCase() === "for this month") ? reportPeriodDetail : (m.description || '')
-      }));
-      combinedCsvString += convertToCSV(processedSummaryMetrics, "Summary Metrics");
-    }
-    if (selectedDataSets.includes('monthlyTrends') && analyticsData.monthlyTrends) {
-      combinedCsvString += convertToCSV(analyticsData.monthlyTrends, "Monthly Trends");
-    }
-    if (selectedDataSets.includes('categorySpending') && analyticsData.categorySpending) {
-      combinedCsvString += convertToCSV(analyticsData.categorySpending.map(c => ({ 
-        Category: c.category, 
-        Amount: c.amount, 
-        Percentage: c.percentage != null ? `${c.percentage.toFixed(2)}%` : 'N/A'
-      })), "Spending by Category");
-    }
-    if (selectedDataSets.includes('dailySpending') && analyticsData.dailySpending) {
-      combinedCsvString += convertToCSV(analyticsData.dailySpending, "Daily Spending Trend");
-    }
-    if (selectedDataSets.includes('expenseByBank') && analyticsData.expenseByBank) {
-      combinedCsvString += convertToCSV(analyticsData.expenseByBank.map(b => ({ 
-        Bank: b.name, 
-        Amount: b.value, 
-        Percentage: b.percentage != null ? `${b.percentage.toFixed(2)}%` : 'N/A'
-      })), "Expenses by Bank");
-    }
-    if (selectedDataSets.includes('allowanceByBank') && analyticsData.allowanceByBank) {
-      combinedCsvString += convertToCSV(analyticsData.allowanceByBank.map(b => ({ 
-        Bank: b.name, 
-        Amount: b.value, 
-        Percentage: b.percentage != null ? `${b.percentage.toFixed(2)}%` : 'N/A'
-      })), "Allowances by Bank");
-    }
-    if (selectedDataSets.includes('allExpenses') && analyticsData.allExpenses) {
-      const expensesToExport = analyticsData.allExpenses
-        .map(exp => {
-            const parsedDate = exp.date ? parseISO(exp.date) : null;
-            const parsedCreatedAt = exp.$createdAt ? parseISO(exp.$createdAt) : null;
-            return {
-                Date: parsedDate && isValid(parsedDate) ? format(parsedDate, 'dd/MM/yy') : '',
-                Name: exp.name,
-                Amount: exp.amount,
-                Category: exp.category,
-                PaymentMethod: exp.paymentMethod,
-                Bank: exp.bank || '',
-                Notes: exp.notes || '',
-                CreatedAt: parsedCreatedAt && isValid(parsedCreatedAt) ? format(parsedCreatedAt, 'dd/MM/yy HH:mm:ss') : (exp.$createdAt || ''),
-                // isRecurring: exp.isRecurring // Keep for XLSX, remove for CSV if not needed there
-            };
-        })
-        .sort((a, b) => {
-            const dateA = a.Date ? new Date(a.Date.split('/').reverse().join('-')) : new Date(0); 
-            const dateB = b.Date ? new Date(b.Date.split('/').reverse().join('-')) : new Date(0);
-            if (!isValid(dateA) && isValid(dateB)) return 1;
-            if (isValid(dateA) && !isValid(dateB)) return -1;
-            if (!isValid(dateA) && !isValid(dateB)) return 0;
-            return compareAsc(dateA, dateB);
-        });
-      combinedCsvString += convertToCSV(expensesToExport, "Detailed Expense List");
-    }
-
-    const blob = new Blob([combinedCsvString], { type: 'text/csv;charset=utf-8;' });
-    downloadFile(blob, getFilename('csv'));
   };
 
   const exportToPDFHandler = async () => {
@@ -695,9 +589,7 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
     toast({ title: "Exporting...", description: `Generating ${exportFormat.toUpperCase()} report. This may take a moment.` });
 
     try {
-      if (exportFormat === 'csv') {
-        exportToCSVHandler();
-      } else if (exportFormat === 'pdf') {
+      if (exportFormat === 'pdf') {
         await exportToPDFHandler();
       } else if (exportFormat === 'xlsx') {
         await exportToXLSXHandler();
@@ -729,14 +621,13 @@ const AnalyticsExportDialog: React.FC<AnalyticsExportDialogProps> = ({
         <div className="py-4 space-y-6">
           <div>
             <Label className="text-sm font-medium dark:text-foreground">Export Format</Label>
-            <Select value={exportFormat} onValueChange={(value: 'csv' | 'pdf' | 'xlsx') => setExportFormat(value)} disabled={isExporting}>
+            <Select value={exportFormat} onValueChange={(value: 'pdf' | 'xlsx') => setExportFormat(value)} disabled={isExporting}>
               <SelectTrigger className="dark:text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="csv" className="dark:text-foreground">CSV (Comma Separated Values)</SelectItem>
-                <SelectItem value="pdf" className="dark:text-foreground">PDF Document</SelectItem>
                 <SelectItem value="xlsx" className="dark:text-foreground">Excel Spreadsheet (.xlsx)</SelectItem>
+                <SelectItem value="pdf" className="dark:text-foreground">PDF Document</SelectItem>
               </SelectContent>
             </Select>
           </div>
