@@ -36,7 +36,6 @@ import {
 } from 'date-fns';
 import AnalyticsExportDialog, { AnalyticsExportableData } from '@/components/AnalyticsExportDialog';
 import { useIsMobile } from '@/hooks/use-mobile'; // Add this if not already present
-
 interface MonthlyTrend {
   month: string;
   expenses: number;
