@@ -102,6 +102,18 @@
     "color": "#22c55e"
   },
   {
+    "id": "gym",
+    "name": "Gym & Fitness",
+    "icon": "Dumbbell",
+    "color": "#0ea5e9"
+  },
+  {
+    "id": "saloon",
+    "name": "Saloon",
+    "icon": "Scissors",
+    "color": "#d946ef"
+  },
+  {
     "id": "other",
     "name": "Other",
     "icon": "MoreHorizontal",

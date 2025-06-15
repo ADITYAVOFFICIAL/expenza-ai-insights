@@ -85,6 +85,7 @@ const AddExpense = () => {
         ...(expenseFormData.paidBy && { paidBy: expenseFormData.paidBy }),
         ...(expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 && { splitBetween: expenseFormData.splitBetween }),
         isSettled: expenseFormData.isSettled || false,
+        isRecurringInstance: false, // Explicitly set to false for manual entries
       };
       
       // 1. Create the individual expense instance

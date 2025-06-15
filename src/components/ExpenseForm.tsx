@@ -473,15 +473,6 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="recurring"
-            checked={formData.isRecurring}
-            onCheckedChange={(checked) => updateFormData('isRecurring', checked)}
-          />
-          <Label htmlFor="recurring" className="text-sm font-medium">Make this a recurring expense</Label>
-        </div>
-
         {/* REMOVED The submit button from here, it will be in DialogFooter */}
         {/* 
         <div className="flex gap-3 pt-4">
