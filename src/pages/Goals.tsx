@@ -428,7 +428,7 @@ const Goals = () => {
 
       {/* Add Money Dialog */}
       <Dialog open={showAddMoneyDialog} onOpenChange={setShowAddMoneyDialog}>
-        <DialogContent>
+        <DialogContent className='dark:text-foreground'>
           <DialogHeader><DialogTitle>Add Money to "{goalToAddMoneyTo?.name}"</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><Label htmlFor="addMoneyAmount">Amount to Add (₹)</Label><Input id="addMoneyAmount" type="number" value={addMoneyAmount} onChange={(e) => setAddMoneyAmount(e.target.value)} placeholder="5000" /></div>
@@ -461,6 +461,34 @@ const Goals = () => {
             <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
               <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">📈 Smart Investing</h4>
               <p className="text-sm text-purple-800 dark:text-purple-200">Consider long-term investment options that match your risk tolerance. Even small, regular investments can grow significantly over time.</p>
+            </div>
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+              <h4 className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">💳 Manage Debt Wisely</h4>
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">Prioritize paying off high-interest debt. Explore strategies like the debt snowball or avalanche method to accelerate your debt repayment journey.</p>
+            </div>
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <h4 className="font-medium text-red-900 dark:text-red-100 mb-2">🛡️ Protect Your Assets</h4>
+              <p className="text-sm text-red-800 dark:text-red-200">Ensure you have adequate insurance coverage (health, life, property) to protect yourself and your family from unforeseen financial hardships.</p>
+            </div>
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+              <h4 className="font-medium text-indigo-900 dark:text-indigo-100 mb-2">🔄 Automate Savings</h4>
+              <p className="text-sm text-indigo-800 dark:text-indigo-200">Set up automatic transfers to your savings and investment accounts each payday. This "pay yourself first" approach makes saving effortless.</p>
+            </div>
+            <div className="p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg">
+              <h4 className="font-medium text-pink-900 dark:text-pink-100 mb-2">🧐 Review Regularly</h4>
+              <p className="text-sm text-pink-800 dark:text-pink-200">Periodically review your financial plan, goals, and investments. Life changes, and your financial strategy should adapt accordingly.</p>
+            </div>
+            <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+              <h4 className="font-medium text-teal-900 dark:text-teal-100 mb-2">🎓 Continuous Learning</h4>
+              <p className="text-sm text-teal-800 dark:text-teal-200">Stay informed about personal finance topics. The more you learn, the better equipped you'll be to make sound financial decisions.</p>
+            </div>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/20 rounded-lg">
+              <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">🎯 Set Clear Financial Goals</h4>
+              <p className="text-sm text-gray-800 dark:text-gray-200">Define specific, measurable, achievable, relevant, and time-bound (SMART) financial goals. This provides direction and motivation for your financial journey.</p>
+            </div>
+            <div className="p-4 bg-lime-50 dark:bg-lime-900/20 rounded-lg">
+              <h4 className="font-medium text-lime-900 dark:text-lime-100 mb-2">✂️ Cut Unnecessary Expenses</h4>
+              <p className="text-sm text-lime-800 dark:text-lime-200">Identify non-essential spending and look for ways to reduce it. Small cutbacks can add up to significant savings over time.</p>
             </div>
           </div>
         </CardContent>
