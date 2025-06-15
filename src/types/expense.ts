@@ -8,15 +8,14 @@ export interface Expense {
   paymentMethod?: string;
   bank?: string;
   notes?: string;
-  receiptUrl?: string;
+  billImages?: string[]; // Changed from billImage: string
   groupId?: string;
   splitWith?: string[]; // User IDs
-  isRecurring?: boolean; // For marking an expense as a template for recurring ones
-  isRecurringInstance?: boolean; // Add this line
+  isRecurring?: boolean;
+  isRecurringInstance?: boolean;
   currency?: string;
-  $createdAt?: string; // ISO string
-  $updatedAt?: string; // ISO string
-  // Add any other properties that might exist
+  $createdAt?: string;
+  $updatedAt?: string;
 }
 
 export interface ExpenseCategory {

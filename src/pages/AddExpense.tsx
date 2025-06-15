@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'; // Added CardFooter
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import ExpenseForm from '@/components/ExpenseForm';
-import { Expense } from '@/types/expense';
-import { RecurringExpense } from '@/types/expense'; // Import RecurringExpense type
+import { Expense, RecurringExpense } from '@/types/expense';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, GenericDocData } from '@/lib/appwrite';
 import { Allowance } from '@/lib/allowanceService';
-import banksData from '@/data/banks.json'; // Import the new bank data
+import banksData from '@/data/banks.json';
 
 interface BankSuggestion {
   name: string;
@@ -21,7 +20,7 @@ const AddExpense = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
-  const [bankSuggestions, setBankSuggestions] = useState<BankSuggestion[]>([]); // Use this instead
+  const [bankSuggestions, setBankSuggestions] = useState<BankSuggestion[]>([]);
 
   useEffect(() => {
     const fetchBankSuggestionsFromAllowances = async () => {
@@ -37,12 +36,15 @@ const AddExpense = () => {
             }
           });
 
-          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
-            const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
-            return { name, icon: bankFromFile?.icon };
-          });
+          // Only use banks from allowances
+          const suggestions: BankSuggestion[] = Array.from(uniqueBankNames)
+            .sort()
+            .map(name => {
+              const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
+              return { name, icon: bankFromFile?.icon };
+            });
           
-          setBankSuggestions(suggestions); // Suggestions will now only contain banks from allowances
+          setBankSuggestions(suggestions);
         } catch (error) {
           console.error("Error fetching bank suggestions:", error);
           toast({
@@ -77,39 +79,37 @@ const AddExpense = () => {
         category: expenseFormData.category!,
         currency: expenseFormData.currency || 'INR',
         ...(expenseFormData.notes && { notes: expenseFormData.notes }),
-        ...(expenseFormData.paymentApp && { paymentMethod: expenseFormData.paymentApp }), // paymentApp from form is paymentMethod in DB
+        ...(expenseFormData.paymentApp && { paymentMethod: expenseFormData.paymentApp }),
         ...(expenseFormData.bank && { bank: expenseFormData.bank }),
         ...(expenseFormData.billImage && { billImage: expenseFormData.billImage }),
-        isRecurring: expenseFormData.isRecurring || false, // This flag remains on the individual expense
+        isRecurring: expenseFormData.isRecurring || false,
+        isRecurringInstance: false, // **FIX:** Explicitly set to false for manual entries
         ...(expenseFormData.groupId && { groupId: expenseFormData.groupId }),
         ...(expenseFormData.paidBy && { paidBy: expenseFormData.paidBy }),
         ...(expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 && { splitBetween: expenseFormData.splitBetween }),
-        isSettled: expenseFormData.isSettled || false,
-        isRecurringInstance: false, // Explicitly set to false for manual entries
+        isSettled: expenseFormData.isSettled ?? (expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 ? false : true),
       };
       
-      // 1. Create the individual expense instance
       await databaseService.createExpense(expenseDataToSave);
       
-      // 2. If marked as recurring, also create a recurring expense template
       if (expenseFormData.isRecurring) {
         const recurringDataToSave: Omit<RecurringExpense, '$id' | '$createdAt' | '$updatedAt' | 'lastPaidDate'> = {
           userId: user.$id,
           name: expenseFormData.name!,
           amount: expenseFormData.amount!,
           category: expenseFormData.category!,
-          frequency: 'monthly', // Defaulting to 'monthly'
-          nextDueDate: expenseFormData.date!, // Use the expense date as the first due date
+          frequency: 'monthly',
+          nextDueDate: expenseFormData.date!,
           isActive: true,
           bank: expenseFormData.bank || undefined,
-          paymentMethod: expenseFormData.paymentApp || undefined, // Use paymentApp from form for paymentMethod
-          notes: expenseFormData.notes || `Recurring template created from expense on ${expenseFormData.date}. Default frequency: monthly.`,
+          paymentMethod: expenseFormData.paymentApp || undefined,
+          notes: expenseFormData.notes || `Recurring template for ${expenseFormData.name}.`,
         };
         await databaseService.createRecurringExpense(recurringDataToSave);
         toast({
           title: "Recurring Template Created",
-          description: `A monthly recurring template for "${expenseFormData.name}" has been created. You can edit its frequency and other details on the 'Recurring Expenses' page.`,
-          duration: 8000, // Longer duration for this specific toast
+          description: `A monthly recurring template for "${expenseFormData.name}" has been created. You can edit it on the 'Recurring' page.`,
+          duration: 7000,
         });
       }
       
@@ -120,7 +120,7 @@ const AddExpense = () => {
       
       navigate('/'); 
     } catch (error: any) {
-      console.error('Error saving expense and/or recurring template:', error);
+      console.error('Error saving expense:', error);
       toast({
         title: "Error Processing Expense",
         description: error.message || "Failed to process expense. Please try again.",
@@ -132,47 +132,50 @@ const AddExpense = () => {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-  <Button
-    variant="ghost"
-    size="icon"
-    onClick={() => navigate(-1)} // Go back to the previous page
-    className="shrink-0 dark:border dark:border-accent dark:hover:bg-accent/20"
-  >
-    <ArrowLeft className="w-5 h-5 dark:text-accent" />
-  </Button>
-  <div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(-1)}
+          className="shrink-0 h-9 w-9"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+        </Button>
+        <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Add New Expense</h1>
           <p className="text-muted-foreground">Record a new transaction or bill split.</p>
         </div>
       </div>
 
-
-      {/* Main Form */}
-      <Card>
+      {/* Main Form Card */}
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Expense Details</CardTitle>
         </CardHeader>
         <CardContent>
           <ExpenseForm 
-            formId="add-expense-form" // Added a formId
+            formId="add-expense-form"
             onSubmit={handleSubmit} 
             isLoading={isLoading} 
             bankSuggestions={bankSuggestions} 
           />
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button type="submit" form="add-expense-form" disabled={isLoading}>
+        <CardFooter className="flex justify-end border-t pt-6">
+          <Button type="submit" form="add-expense-form" disabled={isLoading} size="lg">
             {isLoading ? (
               <>
-                <Plus className="w-4 h-4 mr-2 animate-spin" /> {/* Or a spinner icon */}
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
                 Adding...
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="w-5 h-5 mr-2" />
                 Add Expense
               </>
             )}

@@ -3,22 +3,22 @@ import { Plus, TrendingUp, Users, Calendar, BarChart3, Target, CreditCard, FileT
 import { Link, useNavigate } from 'react-router-dom';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import QuickStats, { QuickStatProps } from '@/components/QuickStats';
+import QuickStats, { QuickStatProps } from '@/components/QuickStats'; // Corrected import path
 import ExpenseCard from '@/components/ExpenseCard';
 import ActivityFeed, { ActivityItem } from '@/components/ActivityFeed';
 import AllowanceManager from '@/components/AllowanceManager';
 import { Expense, RecurringExpense } from '@/types/expense';
 import { Allowance, AllowanceData, processPastDueAllowances } from '@/lib/allowanceService';
-import { processPastDueRecurringExpenses } from '@/lib/recurringExpenseService'; // Import the new service
+import { processPastDueRecurringExpenses } from '@/lib/recurringExpenseService';
 import { Progress } from '@/components/ui/progress';
 import * as LucideIcons from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, storageService, COLLECTIONS, GenericDocData } from '@/lib/appwrite';
 import { toast } from '@/hooks/use-toast';
-import { startOfMonth, endOfMonth, isWithinInterval, parseISO, isValid, addDays, addWeeks, addMonths, addYears, format } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, parseISO, isValid, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import categoriesData from '@/data/categories.json';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import ExpenseForm from '@/components/ExpenseForm';
 import banksData from '@/data/banks.json';
 
@@ -69,7 +69,6 @@ const Dashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      // Step 1: Fetch templates for processing
       const [allowancesToProcessRes, recurringToProcessRes] = await Promise.all([
         databaseService.getAllowances(user.$id),
         databaseService.getRecurringExpenses(user.$id),
@@ -78,7 +77,6 @@ const Dashboard = () => {
       const allowancesToProcess = (allowancesToProcessRes.documents as unknown as Allowance[]) || [];
       const recurringToProcess = (recurringToProcessRes.documents as unknown as RecurringExpense[]) || [];
       
-      // Step 2: Process both allowances and recurring expenses
       const allowancesWereProcessed = await processPastDueAllowances(allowancesToProcess, user.$id, user.name);
       const recurringWereProcessed = await processPastDueRecurringExpenses(recurringToProcess, user.$id, user.name);
 
@@ -89,7 +87,6 @@ const Dashboard = () => {
         toast({ title: "Recurring Bills Updated", description: "Your recurring bills have been automatically logged." });
       }
 
-      // Step 3: Fetch all data again to get the freshest state
       const [expensesRes, allowancesRes, recurringExpensesRes] = await Promise.all([
         databaseService.getExpenses(user.$id, 100),
         databaseService.getAllowances(user.$id),
@@ -104,14 +101,12 @@ const Dashboard = () => {
       setAllowances(fetchedAllowances);
       setRecurringExpensesList(fetchedRecurringExpenses);
 
-      // --- All subsequent calculations will now use the up-to-date 'fetchedExpenses' ---
-
       const now = new Date();
       const currentMonthStart = startOfMonth(now);
       const currentMonthEnd = endOfMonth(now);
 
       const monthlyTransactions = fetchedExpenses.filter(exp => 
-        isWithinInterval(parseISO(exp.date), { start: currentMonthStart, end: currentMonthEnd })
+        isValid(parseISO(exp.date)) && isWithinInterval(parseISO(exp.date), { start: currentMonthStart, end: currentMonthEnd })
       );
 
       const monthlyIncomeTransactions = monthlyTransactions.filter(exp => exp.amount < 0);
@@ -196,16 +191,15 @@ const Dashboard = () => {
           allowancesDocs.forEach(allowance => {
             if (allowance.bankName) uniqueBankNames.add(allowance.bankName);
           });
+          banksData.forEach(bankFileEntry => {
+            if (!uniqueBankNames.has(bankFileEntry.name)) {
+              uniqueBankNames.add(bankFileEntry.name);
+            }
+          });
           const suggestions: BankSuggestion[] = Array.from(uniqueBankNames).sort().map(name => {
             const bankFromFile = banksData.find(b => b.name.toLowerCase() === name.toLowerCase());
             return { name, icon: bankFromFile?.icon };
           });
-          banksData.forEach(bankFileEntry => {
-            if (!suggestions.some(s => s.name.toLowerCase() === bankFileEntry.name.toLowerCase())) {
-              suggestions.push({ name: bankFileEntry.name, icon: bankFileEntry.icon });
-            }
-          });
-          suggestions.sort((a, b) => a.name.localeCompare(b.name));
           setBankSuggestionsForEdit(suggestions);
         } catch (error) {
           toast({ title: "Error", description: "Could not load bank suggestions for editing.", variant: "destructive" });
@@ -216,7 +210,7 @@ const Dashboard = () => {
   }, [showEditExpenseDialog, user]);
 
   const handleEditExpense = (expense: Expense) => {
-    if (expense.$id?.startsWith('recurring-')) {
+    if (expense.isRecurringInstance) {
       toast({ title: "Info", description: "Edit recurring expenses from the 'Recurring' page.", variant: "default" });
       navigate('/recurring');
       return;
@@ -466,17 +460,29 @@ const Dashboard = () => {
           setShowEditExpenseDialog(isOpen);
           if (!isOpen) setEditingExpense(null);
         }}>
-          <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl lg:max-w-3xl">
-            <DialogHeader>
+          <DialogContent className="bg-card border text-foreground border-card flex flex-col max-h-[90vh] sm:max-h-[80vh] w-[90vw] max-w-lg p-0 rounded-lg shadow-lg">
+            <DialogHeader className="p-6 pb-4 border-b">
               <DialogTitle>Edit Expense</DialogTitle>
             </DialogHeader>
-            <ExpenseForm
-              onSubmit={handleUpdateSubmittedExpense}
-              isLoading={isSubmittingEdit}
-              initialData={editingExpense}
-              isEditing={true}
-              bankSuggestions={bankSuggestionsForEdit}
-            />
+            <div className="flex-1 overflow-y-auto px-6 py-4 no-scrollbar">
+                <ExpenseForm
+                    formId="edit-expense-form"
+                    onSubmit={handleUpdateSubmittedExpense}
+                    isLoading={isSubmittingEdit}
+                    initialData={editingExpense}
+                    isEditing={true}
+                    bankSuggestions={bankSuggestionsForEdit}
+                    onDelete={handleDeleteExpense}
+                />
+            </div>
+            <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-4 border-t">
+              <DialogClose asChild>
+                <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={isSubmittingEdit}>Cancel</Button>
+              </DialogClose>
+              <Button type="submit" form="edit-expense-form" className="w-full sm:w-auto" disabled={isSubmittingEdit}>
+                {isSubmittingEdit ? 'Updating...' : 'Update Expense'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
