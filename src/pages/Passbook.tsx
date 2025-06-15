@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { BookOpenText, AlertTriangle, Search, Filter as FilterIcon, XCircle, PlusCircle, Repeat, ArrowDownUp, TrendingDown, TrendingUp } from 'lucide-react';
+import { BookOpenText, AlertTriangle, Search, Filter as FilterIcon, XCircle, PlusCircle, Repeat,FilterX, ArrowDownUp, TrendingDown, TrendingUp } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { databaseService, GenericDocData, COLLECTIONS, storageService } from '@/lib/appwrite';
@@ -242,15 +242,25 @@ const Passbook = () => {
     if (!editingTransaction?.$id || !user?.$id) return;
     setIsSubmittingEdit(true);
     try {
-      await databaseService.updateExpense(editingTransaction.$id, {
-        name: expenseFormData.name!, amount: expenseFormData.amount!, date: expenseFormData.date!,
-        category: expenseFormData.category!, currency: expenseFormData.currency || 'INR', notes: expenseFormData.notes || undefined,
-        paymentMethod: (expenseFormData as any).paymentApp || undefined, bank: expenseFormData.bank || undefined,
-        billImage: expenseFormData.billImage, isRecurring: expenseFormData.isRecurring || false,
-        groupId: expenseFormData.groupId || undefined, paidBy: expenseFormData.paidBy || undefined,
+      const updatePayload: Partial<Expense> & { [key: string]: any } = {
+        name: expenseFormData.name!,
+        amount: expenseFormData.amount!,
+        date: expenseFormData.date!,
+        category: expenseFormData.category!,
+        currency: expenseFormData.currency || 'INR',
+        notes: expenseFormData.notes || undefined,
+        paymentMethod: (expenseFormData as any).paymentApp || undefined, // paymentApp from form becomes paymentMethod
+        bank: expenseFormData.bank || undefined,
+        billImage: expenseFormData.billImage,
+        isRecurring: expenseFormData.isRecurring || false, // This is the flag from the form's checkbox
+        groupId: expenseFormData.groupId || undefined,
+        paidBy: expenseFormData.paidBy || undefined,
         splitBetween: expenseFormData.splitBetween && expenseFormData.splitBetween.length > 0 ? expenseFormData.splitBetween : undefined,
         isSettled: expenseFormData.isSettled,
-      });
+        isRecurringInstance: false, // Explicitly set to false for any edited transaction
+      };
+
+      await databaseService.updateExpense(editingTransaction.$id, updatePayload);
       toast({ title: "Transaction Updated", description: "The transaction has been successfully updated." });
       setShowEditTransactionDialog(false);
       fetchData();
