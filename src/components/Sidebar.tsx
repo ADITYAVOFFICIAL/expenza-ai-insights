@@ -15,6 +15,7 @@ import {
   Calendar,
   CreditCard,
   PiggyBank,
+  Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -34,6 +35,7 @@ const navSections = [
     items: [
       { icon: BarChart3, label: 'Analytics', href: '/analytics' },
       { icon: TrendingUp, label: 'Reports', href: '/reports' },
+      { icon: Brain, label: 'AI Overview', href: '/ai' },
     ],
   },
   {

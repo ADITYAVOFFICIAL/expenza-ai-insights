@@ -1,11 +1,11 @@
+// src/components/ExpenseForm.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Upload, Scan, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import CategorySelector from './CategorySelector';
@@ -17,6 +17,12 @@ import { storageService } from '@/lib/appwrite';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { format, parseISO, isValid } from 'date-fns';
+import { scanBillWithGemini } from '@/lib/gemini';
+
+// --- FIX: Import missing data files ---
+import categoriesData from '@/data/categories.json';
+import paymentAppsData from '@/data/paymentApps.json';
+
 interface BankSuggestion {
   name: string;
   icon?: string;
@@ -29,7 +35,7 @@ interface ExpenseFormProps {
   isEditing?: boolean;
   onDelete?: (expenseId: string) => void;
   bankSuggestions?: BankSuggestion[];
-  formId?: string; // Add formId prop
+  formId?: string;
 }
 
 const ExpenseForm: React.FC<ExpenseFormProps> = ({ 
@@ -39,7 +45,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
   isEditing = false,
   onDelete,
   bankSuggestions = [],
-  formId // Destructure formId
+  formId
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
@@ -53,12 +59,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     isRecurring: false,
     groupId: '',
     splitBetween: [] as string[],
-    paidBy: user?.name || 'You', // Default to current user's name or 'You'
-    billImage: null, // Changed from '' to null
-    currency: 'INR', // Added currency from your thoughts
+    paidBy: user?.name || 'You',
+    billImage: null as string | null,
+    currency: 'INR',
   });
 
-  const [showBillScanner, setShowBillScanner] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const scanBillInputRef = useRef<HTMLInputElement>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [billFileToUpload, setBillFileToUpload] = useState<File | null>(null);
   const manualBillUploadRef = useRef<HTMLInputElement>(null);
@@ -74,79 +81,58 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
 
   useEffect(() => {
     if (initialData) {
-      let dateToSet = new Date().toISOString().split('T')[0]; // Default to today in YYYY-MM-DD format
-
+      let dateToSet = new Date().toISOString().split('T')[0];
       if (initialData.date) {
-        const parsedDate = parseISO(initialData.date); // Parse the ISO string
+        const parsedDate = parseISO(initialData.date);
         if (isValid(parsedDate)) {
-          dateToSet = format(parsedDate, 'yyyy-MM-dd'); // Format to YYYY-MM-DD
+          dateToSet = format(parsedDate, 'yyyy-MM-dd');
         } else {
           console.warn(`Invalid date string received in initialData.date: ${initialData.date}`);
-          // dateToSet remains the default (today's date)
         }
       }
-
       setFormData({
         name: initialData.name || '',
         amount: initialData.amount?.toString() || '',
         category: initialData.category || '',
-        // Prioritize paymentMethod from initialData, then paymentApp (for legacy), then empty
         paymentApp: initialData.paymentMethod || (initialData as any).paymentApp || '', 
         bank: initialData.bank || '',
-        date: dateToSet, // Use the correctly formatted date
+        date: dateToSet,
         notes: initialData.notes || '',
         isRecurring: initialData.isRecurring || false,
         groupId: initialData.groupId || '',
         splitBetween: initialData.splitBetween || [],
         paidBy: initialData.paidBy || user?.name || 'You',
-        billImage: initialData.billImage || null, // Changed from || '' to || null
+        billImage: initialData.billImage || null,
         currency: initialData.currency || 'INR',
-        // Ensure all relevant fields from initialData are mapped here
       });
       if (initialData.billImage) {
-        setBillFileToUpload(null); // Clear any staged file if initial data has an image
+        setBillFileToUpload(null);
       }
     }
-    // If initialData is not provided, the form will use the default state values,
-    // including the default date set in useState.
   }, [initialData, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isEditing) {
-      // Simple duplicate check placeholder, enhance as needed
-      // const isDuplicate = checkForDuplicate();
-      // if (isDuplicate && !duplicateWarning) {
-      //   setDuplicateWarning("A similar expense was added recently. Do you want to continue?");
-      //   return;
-      // }
-    }
-    
-    // Determine the bill image ID to be saved
-    let billImageValueForSubmit: string | null = formData.billImage; // formData.billImage is now ID or null
+    let billImageValueForSubmit: string | null = formData.billImage;
 
-    if (billFileToUpload) { // If a new file is selected for upload
+    if (billFileToUpload) {
       try {
         const uploadedFile = await storageService.uploadFile(billFileToUpload);
-        billImageValueForSubmit = uploadedFile.$id; // Use the new file ID
+        billImageValueForSubmit = uploadedFile.$id;
         toast({ title: "Bill Image Uploaded", description: "Receipt image saved." });
       } catch (error) {
         console.error("Error uploading bill image:", error);
-        toast({ title: "Bill Upload Failed", description: "Could not upload bill image. Please try again.", variant: "destructive" });
-        return; // Stop submission if bill upload fails
+        toast({ title: "Bill Upload Failed", description: "Could not upload bill image.", variant: "destructive" });
+        return;
       }
     }
-    // If billFileToUpload is null, billImageValueForSubmit remains formData.billImage
-    // - If image was removed: formData.billImage is null, so billImageValueForSubmit is null.
-    // - If existing image kept: formData.billImage is an ID, so billImageValueForSubmit is that ID.
-    // - If no image initially: formData.billImage is null, so billImageValueForSubmit is null.
 
     const expenseData: Partial<Expense> = {
       name: formData.name,
       amount: parseFloat(formData.amount as string),
       category: formData.category,
-      paymentApp: formData.paymentApp || undefined,
+      paymentMethod: formData.paymentApp || undefined,
       bank: formData.bank || undefined,
       date: formData.date,
       notes: formData.notes || undefined,
@@ -156,7 +142,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
       paidBy: formData.paidBy,
       isSettled: initialData?.isSettled ?? (formData.splitBetween && formData.splitBetween.length > 0 ? false : true),
       currency: formData.currency, 
-      billImage: billImageValueForSubmit, // Use the determined value (ID or null)
+      billImage: billImageValueForSubmit,
     };
     
     if (isEditing && initialData?.$id) {
@@ -169,80 +155,72 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     
     if (!isEditing) {
       setFormData({
-        name: '',
-        amount: '',
-        category: '',
-        paymentApp: '',
-        bank: '',
+        name: '', amount: '', category: '', paymentApp: '', bank: '',
         date: new Date().toISOString().split('T')[0],
-        notes: '',
-        isRecurring: false,
-        groupId: '',
-        splitBetween: [],
-        paidBy: user?.name || 'You',
-        billImage: null, // Changed from '' to null
-        currency: 'INR',
+        notes: '', isRecurring: false, groupId: '', splitBetween: [],
+        paidBy: user?.name || 'You', billImage: null, currency: 'INR',
       });
       setBillFileToUpload(null);
-      if(manualBillUploadRef.current) manualBillUploadRef.current.value = ""; // Reset file input
+      if(manualBillUploadRef.current) manualBillUploadRef.current.value = "";
     }
   };
 
-  // const checkForDuplicate = (): boolean => {
-  //   // Implement actual duplicate checking logic here
-  //   // e.g., query existing expenses for similar name, amount, date
-  //   return false;
-  // };
+  const handleBillFileSelectedForScan = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const handleBillScan = (scannedData: { vendor?: string; amount?: number; date?: string; category?: string, file?: File }) => {
-    setFormData(prev => ({
-      ...prev,
-      name: scannedData.vendor || prev.name,
-      amount: scannedData.amount?.toString() || prev.amount,
-      date: scannedData.date || prev.date, // Ensure date format is YYYY-MM-DD
-      category: scannedData.category || prev.category,
-    }));
-    if (scannedData.file) {
-      setBillFileToUpload(scannedData.file);
-      setFormData(prev => ({ ...prev, billImage: '' })); // Clear existing file ID if new file is scanned
+    setIsScanning(true);
+    toast({ title: "Scanning Bill...", description: "The AI is analyzing your receipt. Please wait." });
+
+    try {
+      const scannedData = await scanBillWithGemini(file);
+      
+      const suggestedCategory = categoriesData.find(c => c.name === scannedData.category);
+      const suggestedPaymentApp = paymentAppsData.find(app => app.name.toLowerCase() === scannedData.paymentApp?.toLowerCase());
+
+      setFormData(prev => ({
+        ...prev,
+        name: scannedData.name || prev.name,
+        amount: scannedData.amount?.toString() || prev.amount,
+        date: scannedData.date || prev.date,
+        category: suggestedCategory?.id || prev.category,
+        paymentApp: suggestedPaymentApp?.id || prev.paymentApp,
+        bank: scannedData.bankName || prev.bank,
+      }));
+
+      setBillFileToUpload(file);
+      toast({ title: "Scan Complete!", description: "Please review the extracted details." });
+
+    } catch (error: any) {
+      toast({ title: "Scan Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsScanning(false);
+      if (event.target) event.target.value = "";
     }
-    setShowBillScanner(false);
-    toast({
-      title: "Bill Scanned",
-      description: "Expense details extracted. Image will be uploaded on submit.",
-    });
   };
-
+  
   const updateFormData = (field: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setDuplicateWarning(null);
   };
-
-  const handleDelete = () => {
-    if (onDelete && initialData?.$id) {
-      if (window.confirm("Are you sure you want to delete this expense? This action cannot be undone.")) {
-        onDelete(initialData.$id);
-      }
-    }
-  };
-
+  
   const handleManualBillUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      if (file.size > 10 * 1024 * 1024) {
         toast({ title: "File Too Large", description: "Please select an image smaller than 10MB", variant: "destructive" });
         return;
       }
       setBillFileToUpload(file);
-      setFormData(prev => ({ ...prev, billImage: '' })); // Clear existing file ID
+      setFormData(prev => ({ ...prev, billImage: null }));
       toast({ title: "Bill Selected", description: `${file.name} will be uploaded on submit.` });
     }
   };
   
   const removeBill = () => {
     setBillFileToUpload(null);
-    setFormData(prev => ({ ...prev, billImage: null })); // Changed from '' to null
-    if(manualBillUploadRef.current) manualBillUploadRef.current.value = ""; // Reset file input
+    setFormData(prev => ({ ...prev, billImage: null }));
+    if(manualBillUploadRef.current) manualBillUploadRef.current.value = "";
   };
 
   const selectedBankData = bankSuggestions.find(b => b.name === formData.bank);
@@ -251,7 +229,7 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
     <div className="space-y-4 lg:space-y-6">
       <form id={formId || "expense-form"} onSubmit={handleSubmit} className="space-y-4">
         {isEditing && initialData?.$id && onDelete && (
-          <div className="flex items-center justify-end mb-2"> {/* Adjusted: Removed h2, using justify-end for delete button */}
+          <div className="flex items-center justify-end mb-2">
             <Button
               type="button"
               variant="destructive"
@@ -269,142 +247,71 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
           <div className="p-4 bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg">
             <p className="text-orange-800 dark:text-orange-300 text-sm">{duplicateWarning}</p>
             <div className="flex gap-2 mt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setDuplicateWarning(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit" // This will re-trigger handleSubmit
-                size="sm"
-                variant="default"
-              >
-                Add Anyway
-              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDuplicateWarning(null)}>Cancel</Button>
+              <Button type="submit" size="sm" variant="default">Add Anyway</Button>
             </div>
           </div>
         )}
 
         {/* Expense Name and Amount */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="name" className="text-sm font-medium">Expense Name *</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Lunch at restaurant"
-              value={formData.name}
-              onChange={(e) => updateFormData('name', e.target.value)}
-              required
-              className="mt-1"
-            />
+            <Input id="name" placeholder="e.g., Lunch at restaurant" value={formData.name} onChange={(e) => updateFormData('name', e.target.value)} required className="mt-1" />
           </div>
           <div>
             <Label htmlFor="amount" className="text-sm font-medium">Amount ({formData.currency || 'INR'}) *</Label>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={formData.amount}
-              onChange={(e) => updateFormData('amount', e.target.value)}
-              required
-              className="mt-1"
-            />
+            <Input id="amount" type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={(e) => updateFormData('amount', e.target.value)} required className="mt-1" />
           </div>
         </div>
 
         {/* Category and Payment Method */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"> {/* Changed lg:grid-cols-2 to md:grid-cols-2 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label className="text-sm font-medium">Category *</Label>
             <div className="mt-1">
-              <CategorySelector
-                value={formData.category}
-                onChange={(value) => updateFormData('category', value)}
-              />
+              <CategorySelector value={formData.category} onChange={(value) => updateFormData('category', value)} />
             </div>
           </div>
           <div>
             <Label className="text-sm font-medium">Payment Method</Label>
             <div className="mt-1">
-              <PaymentMethodSelector
-                value={formData.paymentApp}
-                onChange={(value) => updateFormData('paymentApp', value)}
-              />
+              <PaymentMethodSelector value={formData.paymentApp} onChange={(value) => updateFormData('paymentApp', value)} />
             </div>
           </div>
         </div>
 
         {/* Date and Bank Account */}
          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div> {/* Date field container */}
+          <div>
             <Label htmlFor="date" className="text-sm font-medium">Date *</Label>
             <div className="relative mt-1">
-              <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => updateFormData('date', e.target.value)}
-                required
-              />
+              <Input id="date" type="date" value={formData.date} onChange={(e) => updateFormData('date', e.target.value)} required />
               <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             </div>
           </div>
           <div>
             <Label htmlFor="bank" className="text-sm font-medium">Bank Account</Label>
-            {/* Always show Popover, CommandInput allows typing new bank */}
             <Popover open={bankPopoverOpen} onOpenChange={setBankPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={bankPopoverOpen}
-                  className="w-full justify-between mt-1 font-normal h-10" // Ensure consistent height
-                >
+                <Button variant="outline" role="combobox" aria-expanded={bankPopoverOpen} className="w-full justify-between mt-1 font-normal h-10">
                   <div className="flex items-center gap-2 truncate">
-                    {selectedBankData?.icon && (
-                      <img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain flex-shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {formData.bank || "Select or type bank..."}
-                    </span>
+                    {selectedBankData?.icon && (<img src={selectedBankData.icon} alt={selectedBankData.name} className="w-4 h-4 object-contain flex-shrink-0" />)}
+                    <span className="truncate">{formData.bank || "Select or type bank..."}</span>
                   </div>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                 <Command>
-                  <CommandInput 
-                    placeholder="Search bank or type new..."
-                    value={formData.bank} 
-                    onValueChange={(searchValue) => updateFormData('bank', searchValue)}
-                  />
-                  <CommandList className="max-h-[250px] overflow-y-auto"> {/* Key styling */}
-                    <CommandEmpty>
-                      {formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}
-                    </CommandEmpty>
+                  <CommandInput placeholder="Search bank or type new..." value={formData.bank} onValueChange={(searchValue) => updateFormData('bank', searchValue)} />
+                  <CommandList className="max-h-[250px] overflow-y-auto">
+                    <CommandEmpty>{formData.bank ? `Add "${formData.bank}" as new bank` : "No bank found. Type to add."}</CommandEmpty>
                     <CommandGroup>
                       {bankSuggestions.map((suggestion) => (
-                        <CommandItem
-                          key={suggestion.name}
-                          value={suggestion.name}
-                          onSelect={(currentValue) => {
-                            updateFormData('bank', currentValue);
-                            setBankPopoverOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.bank === suggestion.name ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {suggestion.icon && (
-                            <img src={suggestion.icon} alt={suggestion.name} className="w-4 h-4 object-contain mr-2" />
-                          )}
+                        <CommandItem key={suggestion.name} value={suggestion.name} onSelect={(currentValue) => { updateFormData('bank', currentValue); setBankPopoverOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", formData.bank === suggestion.name ? "opacity-100" : "opacity-0")} />
+                          {suggestion.icon && (<img src={suggestion.icon} alt={suggestion.name} className="w-4 h-4 object-contain mr-2" />)}
                           {suggestion.name}
                         </CommandItem>
                       ))}
@@ -419,23 +326,13 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
         <div>
           <Label className="text-sm font-medium">Split with Group (Optional)</Label>
           <div className="mt-1">
-            <GroupSelector
-              value={formData.groupId}
-              onChange={(value) => updateFormData('groupId', value)}
-            />
+            <GroupSelector value={formData.groupId} onChange={(value) => updateFormData('groupId', value)} />
           </div>
         </div>
 
         <div>
           <Label htmlFor="notes" className="text-sm font-medium">Notes</Label>
-          <Textarea
-            id="notes"
-            placeholder="Add any additional details..."
-            value={formData.notes}
-            onChange={(e) => updateFormData('notes', e.target.value)}
-            rows={3}
-            className="mt-1"
-          />
+          <Textarea id="notes" placeholder="Add any additional details..." value={formData.notes} onChange={(e) => updateFormData('notes', e.target.value)} rows={3} className="mt-1" />
         </div>
 
         <div className="space-y-2">
@@ -445,42 +342,24 @@ const ExpenseForm: React.FC<ExpenseFormProps> = ({
               <span className="text-sm text-foreground truncate max-w-[calc(100%-5rem)]">
                 {billFileToUpload ? billFileToUpload.name : (formData.billImage ? 'Uploaded bill' : '')}
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={removeBill}
-              >
-                Remove
-              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={removeBill}>Remove</Button>
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Button type="button" variant="outline" className="w-full" onClick={() => scanBillInputRef.current?.click()} disabled={isScanning}>
+              <Scan className="w-4 h-4 mr-2" />
+              {isScanning ? 'Scanning...' : 'Scan with AI'}
+            </Button>
+            <input ref={scanBillInputRef} type="file" accept="image/*" className="hidden" onChange={handleBillFileSelectedForScan} />
             <Button type="button" variant="outline" className="w-full asChild">
               <Label htmlFor="manual-bill-upload" className="cursor-pointer flex items-center justify-center w-full h-full m-0">
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Manually
               </Label>
             </Button>
-            <input 
-              id="manual-bill-upload" 
-              ref={manualBillUploadRef}
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              onChange={handleManualBillUpload} 
-            />
+            <input id="manual-bill-upload" ref={manualBillUploadRef} type="file" accept="image/*" className="hidden" onChange={handleManualBillUpload} />
           </div>
         </div>
-
-        {/* REMOVED The submit button from here, it will be in DialogFooter */}
-        {/* 
-        <div className="flex gap-3 pt-4">
-          <Button type="submit" disabled={isLoading} className="flex-1">
-            {isLoading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update Expense' : 'Add Expense')}
-          </Button>
-        </div> 
-        */}
       </form>
     </div>
   );

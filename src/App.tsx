@@ -13,7 +13,6 @@ import Signup from '@/pages/Signup';
 import LandingPage from '@/components/LandingPage';
 import Privacy from '@/pages/Privacy';
 import Tos from '@/pages/Tos';
-
 const queryClient = new QueryClient();
 
 // Lazy load page components
@@ -27,6 +26,7 @@ const Reports = React.lazy(() => import("./pages/Reports"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const PassBook = React.lazy(() => import("./pages/Passbook"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
+const AIOverview = React.lazy(() => import("./pages/AIOverview"));
 
 // A simple loader component for Suspense fallback
 const PageLoader = () => (
@@ -97,6 +97,7 @@ const AppContent = () => {
             <Route path="reports" element={<Reports />} />
             <Route path="profile" element={<Profile />} />
             <Route path="passbook" element={<PassBook />} />
+             <Route path="ai" element={<AIOverview />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
